@@ -37,8 +37,7 @@ def _get_or_create_worksheet(client, experiment_name: str):
         ws = sh.worksheet(experiment_name)
     except gspread.WorksheetNotFound:
         ws = sh.add_worksheet(title=experiment_name, rows=1000, cols=50)
-        # כותרת ראשונה בסיסית – נשכתב אותה בקריאה הראשונה ל-log_experiment_to_sheet
-        ws.update("A1", "timestamp")
+        # לא צריך לכתוב כלום כאן – הכותרת תעודכן בפעם הראשונה שנקרא ל-log_experiment_to_sheet
 
     return ws
 
