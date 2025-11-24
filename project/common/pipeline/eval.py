@@ -60,3 +60,27 @@ def eval_model(model, loader, device):
     }
 
     return overall_acc, class0_acc, class1_acc, metrics, cm
+
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+
+def plot_confusion_matrix(cm, class_names=["NORMAL", "PNEUMONIA"]):
+    """
+    Draw a confusion matrix heatmap.
+    cm: numpy array of shape (2,2)
+    """
+    plt.figure(figsize=(6, 5))
+    sns.heatmap(
+        cm,
+        annot=True,
+        fmt="d",
+        cmap="Blues",
+        xticklabels=class_names,
+        yticklabels=class_names,
+    )
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
+    plt.title("Confusion Matrix")
+    plt.show()
