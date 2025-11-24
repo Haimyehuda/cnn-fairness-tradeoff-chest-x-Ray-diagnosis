@@ -348,7 +348,7 @@ def ensure_dir(path: str):
 def plot_confusion_matrix(cm, scenario: str, out_dir: str, show: bool = False):
     ensure_dir(out_dir)
     fig, ax = plt.subplots(figsize=(5, 5))
-    im = ax.imshow(cm, interpolation="nearest")
+    im = ax.imshow(cm, interpolation="nearest", cmap="PuBu")
     ax.set_title(f"Confusion Matrix – {scenario} model")
     plt.colorbar(im, ax=ax)
 
