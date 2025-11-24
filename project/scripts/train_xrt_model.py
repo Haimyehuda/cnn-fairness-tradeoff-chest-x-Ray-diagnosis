@@ -265,6 +265,16 @@ def train_xrt_model():
     torch.save(checkpoint, ckpt_path)
     print(f"✔ Checkpoint saved to: {ckpt_path}")
 
+    print("\n=== TRAINING SUMMARY ===")
+    print(f"Model architecture : {MODEL_ARCH}")
+    print(f"Pretrained         : True")  # כי אנחנו תמיד עובדים עם DenseNet121
+    print(f"Epochs trained     : {EPOCHS}")
+    print(f"Train samples      : {len(train_ds)}")
+    print(f"Test samples       : {len(test_ds)}")
+    print(f"Final loss         : {history[-1] if history else 'N/A'}")
+    print(f"Checkpoint saved   : {ckpt_path}")
+    print("==================================")
+
 
 # ===============================================================
 # Entry point
