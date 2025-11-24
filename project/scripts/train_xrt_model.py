@@ -39,9 +39,10 @@ from utils import get_device  # מתוך common/utils.py
 
 CHEXPERT_ROOT = "/content/chexpert"  # כמו ב-Init
 CKPT_DIR = "/content/drive/MyDrive/XRT_Models"
-MODEL_ARCH = "resnet18"
+MODEL_ARCH = "densenet121"
 BATCH_SIZE = 16
-EPOCHS = 5
+EPOCHS = 2
+TRANNING_N = 25
 LR = 1e-4
 
 
@@ -195,13 +196,13 @@ def train_xrt_model():
     # בוחרים כמה דגימות לפי התרחיש
     if args.scenario == "balanced":
         # ברירת מחדל למודל מאוזן – אפשר לשנות בהמשך
-        n_pneu = 1100
-        n_norm = 1100
+        n_pneu = TRANNING_N * 2  # for GPU - > 1100
+        n_norm = TRANNING_N * 2  # for GPU - > 1100
         ckpt_path = os.path.join(CKPT_DIR, "chexpert_resnet18_balanced.pth")
     elif args.scenario == "imbalanced":
         # כל הדאטה – לא שולחים גבולות
-        n_pneu = None
-        n_norm = None
+        n_pneu = TRANNING_N * 5  # for GPU - > None
+        n_norm = TRANNING_N  # for GPU - > None
         ckpt_path = os.path.join(CKPT_DIR, "chexpert_resnet18_imbalanced.pth")
     else:  # custom
         n_pneu = args.n_pneumonia
@@ -224,8 +225,12 @@ def train_xrt_model():
     train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True)
     test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=False)
 
+    # שליטה פשוטה: GPU או CPU
+
+    if torch.cuda.is_available():
+        print("✔ Using GPU (cuda)")
     device = get_device()
-    print(f"✔ Using device: {device}")
+    print(f"✔ Using {device}")
 
     # בינתיים – מתחילים מאפס בכל פעם (בלי המשך מאותו checkpoint)
     model = get_model(
