@@ -198,16 +198,16 @@ def train_xrt_model():
         # ברירת מחדל למודל מאוזן – אפשר לשנות בהמשך
         n_pneu = TRANNING_N * 2  # for GPU - > 1100
         n_norm = TRANNING_N * 2  # for GPU - > 1100
-        ckpt_path = os.path.join(CKPT_DIR, "chexpert_resnet18_balanced.pth")
+        ckpt_path = os.path.join(CKPT_DIR, f"chexpert_{MODEL_ARCH}_balanced.pth")
     elif args.scenario == "imbalanced":
         # כל הדאטה – לא שולחים גבולות
         n_pneu = TRANNING_N * 5  # for GPU - > None
         n_norm = TRANNING_N  # for GPU - > None
-        ckpt_path = os.path.join(CKPT_DIR, "chexpert_resnet18_imbalanced.pth")
+        ckpt_path = os.path.join(CKPT_DIR, f"chexpert_{MODEL_ARCH}_imbalanced.pth")
     else:  # custom
         n_pneu = args.n_pneumonia
         n_norm = args.n_normal
-        ckpt_path = os.path.join(CKPT_DIR, "chexpert_resnet18_custom.pth")
+        ckpt_path = os.path.join(CKPT_DIR, f"chexpert_{MODEL_ARCH}_custom.pth")
 
     print("\n==============================")
     print(f"Scenario   : {args.scenario}")
