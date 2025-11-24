@@ -19,13 +19,16 @@ from torch.utils.data import DataLoader
 # -----------------------------
 # Global config (paths)
 # -----------------------------
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))  # תיקיית project/
-PROJECT_ROOT = SCRIPT_DIR
-COMMON_PATH = os.path.join(PROJECT_ROOT, "common")
 
-# נוסיף את common ל-PYTHONPATH כדי שנוכל לייבא את model/train/utils/dataset
-if COMMON_PATH not in sys.path:
-    sys.path.append(COMMON_PATH)
+# תיקייה של הסקריפט: .../project/scripts
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# תיקיית הפרויקט: .../project
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+
+# נוסיף את project ל-PYTHONPATH → ואז אפשר לעשות import common.
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
 
 # עכשיו ה-imports מתוך common
 from common.dataset import ChestDataset, clean_path, build_xrt_dataset, CHEXPERT_ROOT
