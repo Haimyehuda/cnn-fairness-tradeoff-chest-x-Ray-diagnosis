@@ -28,7 +28,7 @@ if COMMON_PATH not in sys.path:
     sys.path.append(COMMON_PATH)
 
 # עכשיו ה-imports מתוך common
-from dataset import ChestDataset, clean_path, build_xrt_dataset, CHEXPERT_ROOT
+from common.dataset import ChestDataset, clean_path, build_xrt_dataset, CHEXPERT_ROOT
 from model import get_model
 from train import train_model
 from utils import get_device
