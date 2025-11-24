@@ -102,6 +102,22 @@ def train_xrt_model():
     print(f"Checkpoint : {ckpt_path}")
     print("==============================")
 
+    # --- show existing checkpoint info (if any) ---
+    if os.path.exists(ckpt_path):
+        print(f"\n🔎 Found existing checkpoint at: {ckpt_path}")
+        try:
+            prev_ckpt = torch.load(ckpt_path, map_location="cpu")
+            prev_epochs = prev_ckpt.get("epochs", "N/A")
+            prev_hist = prev_ckpt.get("history", {})
+            prev_losses = prev_hist.get("loss", [])
+            prev_last_loss = prev_losses[-1] if prev_losses else "N/A"
+            print(f"   Previously trained epochs: {prev_epochs}")
+            print(f"   Previous last loss       : {prev_last_loss}")
+        except Exception as e:
+            print(f"   (Could not read old checkpoint: {e})")
+    else:
+        print(f"\n🆕 No existing checkpoint. Training from scratch.")
+
     # בניית הדאטאסט
     train_ds, test_ds = build_xrt_dataset(
         n_pneumonia=n_pneu,
@@ -118,7 +134,8 @@ def train_xrt_model():
     device = get_device()
     print(f"✔ Using {device}")
 
-    # בינתיים – מתחילים מאפס בכל פעם (בלי המשך מאותו checkpoint)
+    # --- NEW: load existing checkpoint (if exists), else start fresh ---
+    start_epoch = 0
     model = get_model(
         arch=MODEL_ARCH,
         num_classes=2,
@@ -126,15 +143,25 @@ def train_xrt_model():
         pretrained=(MODEL_ARCH == "resnet18" or MODEL_ARCH == "densenet121"),
     ).to(device)
 
+    if os.path.exists(ckpt_path):
+        print(f"🔄 Loading existing checkpoint from {ckpt_path}")
+        ckpt = torch.load(ckpt_path, map_location=device)
+        model.load_state_dict(ckpt["state_dict"])
+        start_epoch = ckpt.get("epochs", 0)
+        print(f"   → Previously trained epochs: {start_epoch}")
+    else:
+        print("🆕 No checkpoint found — starting from scratch.")
+
     print("\n🚀 Starting training...")
     t0 = time.time()
 
+    # train EPOCHS more epochs from the checkpoint
     model, history = train_model(
         model=model,
         train_loader=train_loader,
         device=device,
         lr=LR,
-        epochs=EPOCHS,
+        epochs=EPOCHS,  # רק כמה להוסיף עכשיו
     )
 
     total_time = time.time() - t0
@@ -143,7 +170,7 @@ def train_xrt_model():
     # שמירת המודל
     checkpoint = {
         "arch": MODEL_ARCH,
-        "epochs": EPOCHS,
+        "epochs": start_epoch + EPOCHS,  # cumulative
         "state_dict": model.state_dict(),
         "history": history,
     }
@@ -154,7 +181,7 @@ def train_xrt_model():
     print("\n=== TRAINING SUMMARY ===")
     print(f"Model architecture : {MODEL_ARCH}")
     print(f"Pretrained         : True")  # כי אנחנו תמיד עובדים עם DenseNet121
-    print(f"Epochs trained     : {EPOCHS}")
+    print(f"Epochs trained     : {EPOCHS + start_epoch}")
     print(f"Train samples      : {len(train_ds)}")
     print(f"Test samples       : {len(test_ds)}")
     if "loss" in history and history["loss"]:
