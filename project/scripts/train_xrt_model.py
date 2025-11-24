@@ -32,9 +32,11 @@ if PROJECT_ROOT not in sys.path:
 
 # עכשיו ה-imports מתוך common
 from common.dataset import ChestDataset, clean_path, build_xrt_dataset, CHEXPERT_ROOT
-from model import get_model
-from train import train_model
-from utils import get_device
+
+from common.model import get_model
+from common.pipeline.train import train_model
+from common.utils import get_device
+
 
 CKPT_DIR = "/content/drive/MyDrive/XRT_Models"
 MODEL_ARCH = "densenet121"
