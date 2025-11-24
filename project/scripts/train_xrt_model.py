@@ -271,7 +271,12 @@ def train_xrt_model():
     print(f"Epochs trained     : {EPOCHS}")
     print(f"Train samples      : {len(train_ds)}")
     print(f"Test samples       : {len(test_ds)}")
-    print(f"Final loss         : {history[-1] if history else 'N/A'}")
+    if "loss" in history and history["loss"]:
+        last_loss = history["loss"][-1]
+    else:
+        last_loss = "N/A"
+
+    print(f"Final loss         : {last_loss}")
     print(f"Checkpoint saved   : {ckpt_path}")
     print("==================================")
 
