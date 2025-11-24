@@ -3,8 +3,8 @@
 # XRT Evaluation – balanced / imbalanced model (script)
 # Usage from Colab (after Init):
 #   %cd /content/cnn-fairness-tradeoff-chest-x-Ray-diagnosis/project
-#   !python scripts/eval_xrt_model.py --scenario balanced
-#   !python scripts/eval_xrt_model.py --scenario imbalanced
+#   !python scripts/eval_xrt_model.py --scenario balanced --show
+#   !python scripts/eval_xrt_model.py --scenario imbalanced --show
 # ===============================================================
 
 import os
@@ -84,6 +84,12 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--show",
+        action="store_true",
+        help="Show plots inline in Colab in addition to saving files.",
+    )
+
+    parser.add_argument(
         "--batch_size",
         type=int,
         default=32,
@@ -159,6 +165,48 @@ def build_eval_subset(n_normal_test: int, n_pneumonia_test: int):
 
     eval_ds = ChestDataset(eval_df, eval_transform)
     return eval_df, eval_ds
+
+
+# ---------------------------------------------------------------
+# 3b. הצגת דוגמאות מהדאטה
+# ---------------------------------------------------------------
+def show_sample_images(eval_df, max_samples: int = 6):
+    """
+    מציג כמה דוגמאות מהסט להמחשה (NORMAL / PNEUMONIA).
+    """
+    print("\n=== Step 2: Showing sample images from evaluation set ===")
+
+    if len(eval_df) == 0:
+        print("No samples to show.")
+        return
+
+    n = min(max_samples, len(eval_df))
+    samples = eval_df.sample(n=n, random_state=RANDOM_STATE)
+
+    rows = 2
+    cols = 3
+    fig, axes = plt.subplots(rows, cols, figsize=(10, 6))
+    axes = axes.flatten()
+
+    for ax, (_, row) in zip(axes, samples.iterrows()):
+        img_path = row["abs"]
+        label = int(row["label"])
+        try:
+            img = plt.imread(img_path)
+            ax.imshow(img, cmap="gray")
+            ax.set_title(CLASS_NAMES.get(label, str(label)))
+            ax.axis("off")
+        except Exception as e:
+            ax.set_title("Error")
+            ax.text(0.5, 0.5, "Error\nloading image", ha="center", va="center")
+            ax.axis("off")
+
+    # אם פחות מתאים 6, מסתירים את השאר
+    for ax in axes[len(samples) :]:
+        ax.axis("off")
+
+    plt.tight_layout()
+    plt.show()
 
 
 # ---------------------------------------------------------------
@@ -291,13 +339,13 @@ def compute_metrics(all_targets, all_preds, all_probs, scenario: str, n_samples:
 
 
 # ---------------------------------------------------------------
-# 7. Plot functions (save PNGs)
+# 7. Plot functions (save PNGs + אופציה להציג)
 # ---------------------------------------------------------------
 def ensure_dir(path: str):
     os.makedirs(path, exist_ok=True)
 
 
-def plot_confusion_matrix(cm, scenario: str, out_dir: str):
+def plot_confusion_matrix(cm, scenario: str, out_dir: str, show: bool = False):
     ensure_dir(out_dir)
     fig, ax = plt.subplots(figsize=(5, 5))
     im = ax.imshow(cm, interpolation="nearest")
@@ -328,11 +376,17 @@ def plot_confusion_matrix(cm, scenario: str, out_dir: str):
 
     out_path = os.path.join(out_dir, f"confusion_matrix_{scenario}.png")
     plt.savefig(out_path, dpi=200)
+
+    if show:
+        plt.show()
+
     plt.close(fig)
     print(f"✔ Confusion matrix saved to: {out_path}")
 
 
-def plot_roc_curve(all_targets, all_probs, auc, scenario: str, out_dir: str):
+def plot_roc_curve(
+    all_targets, all_probs, auc, scenario: str, out_dir: str, show: bool = False
+):
     ensure_dir(out_dir)
     fpr, tpr, thresholds = roc_curve(all_targets, all_probs)
 
@@ -348,11 +402,15 @@ def plot_roc_curve(all_targets, all_probs, auc, scenario: str, out_dir: str):
 
     out_path = os.path.join(out_dir, f"roc_{scenario}.png")
     plt.savefig(out_path, dpi=200)
+
+    if show:
+        plt.show()
+
     plt.close(fig)
     print(f"✔ ROC curve saved to: {out_path}")
 
 
-def plot_tpr_bars(report_dict, scenario: str, out_dir: str):
+def plot_tpr_bars(report_dict, scenario: str, out_dir: str, show: bool = False):
     ensure_dir(out_dir)
     tprs = [
         report_dict[CLASS_NAMES[0]]["recall"],
@@ -370,6 +428,10 @@ def plot_tpr_bars(report_dict, scenario: str, out_dir: str):
 
     out_path = os.path.join(out_dir, f"tpr_{scenario}.png")
     plt.savefig(out_path, dpi=200)
+
+    if show:
+        plt.show()
+
     plt.close(fig)
     print(f"✔ Per-class TPR bar chart saved to: {out_path}")
 
@@ -385,6 +447,10 @@ def main():
         n_normal_test=args.n_normal_test,
         n_pneumonia_test=args.n_pneumonia_test,
     )
+
+    # אם ביקשו show – מציגים דוגמאות מהסט
+    if args.show:
+        show_sample_images(eval_df, max_samples=6)
 
     eval_loader = DataLoader(
         eval_ds,
@@ -403,11 +469,11 @@ def main():
         all_targets, all_preds, all_probs, args.scenario, len(eval_df)
     )
 
-    # 5) גרפים לקבצים (PNG)
+    # 5) גרפים לקבצים (PNG) + אופציה להציג בקולאב
     out_dir = os.path.join(args.out_dir, f"xrt_eval_{args.scenario}")
-    plot_confusion_matrix(cm, args.scenario, out_dir)
-    plot_roc_curve(all_targets, all_probs, auc, args.scenario, out_dir)
-    plot_tpr_bars(report_dict, args.scenario, out_dir)
+    plot_confusion_matrix(cm, args.scenario, out_dir, show=args.show)
+    plot_roc_curve(all_targets, all_probs, auc, args.scenario, out_dir, show=args.show)
+    plot_tpr_bars(report_dict, args.scenario, out_dir, show=args.show)
 
     print("\n✅ Finished XRT evaluation script.")
 
