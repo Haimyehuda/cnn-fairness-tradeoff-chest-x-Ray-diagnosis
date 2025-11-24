@@ -167,8 +167,71 @@ def _make_resnet18(
     return model
 
 
+def _make_densenet121(
+    num_classes: int = 2,
+    in_channels: int = 1,
+    pretrained: bool = True,
+) -> nn.Module:
+    """
+    DenseNet-121 פרה-טריינד כ–backbone ל–Chest X-Ray.
+
+    הערות:
+      - תומך ב–in_channels != 3 (למשל 1 ערוץ ל–X-ray אפור)
+      - אם in_channels == 1 והמודל פרה-טריינד, משכפל את המשקלים
+        מה–RGB כך שהערוץ היחיד הוא ממוצע הערוצים.
+    """
+
+    if not HAS_TORCHVISION:
+        raise ImportError(
+            "torchvision is required for DenseNet-121 backbone. "
+            "Install it or use SimpleCNN/MediumCNN via get_model(arch='simple'/'medium')."
+        )
+
+    # תמיכה ב–API החדש/ישן של torchvision
+    try:
+        from torchvision.models import densenet121, DenseNet121_Weights
+
+        weights = DenseNet121_Weights.IMAGENET1K_V1 if pretrained else None
+        model = densenet121(weights=weights)
+    except Exception:
+        from torchvision.models import densenet121
+
+        model = densenet121(pretrained=pretrained)
+
+    # התאמת מספר ערוצים (למשל 1 ערוץ ל–X-ray אפור)
+    # ב-DenseNet, הקונבולוציה הראשונה היא features.conv0
+    if in_channels != 3:
+        old_conv = model.features.conv0
+        model.features.conv0 = nn.Conv2d(
+            in_channels,
+            old_conv.out_channels,
+            kernel_size=old_conv.kernel_size,
+            stride=old_conv.stride,
+            padding=old_conv.padding,
+            bias=old_conv.bias is not None,
+        )
+
+        with torch.no_grad():
+            if pretrained and in_channels == 1:
+                # old_conv.weight: (out_channels, 3, k, k)
+                mean_weight = old_conv.weight.mean(dim=1, keepdim=True)
+                model.features.conv0.weight.copy_(mean_weight)
+            else:
+                nn.init.kaiming_normal_(
+                    model.features.conv0.weight, mode="fan_out", nonlinearity="relu"
+                )
+            if model.features.conv0.bias is not None:
+                nn.init.zeros_(model.features.conv0.bias)
+
+    # החלפת השכבה האחרונה ל–num_classes
+    in_features = model.classifier.in_features
+    model.classifier = nn.Linear(in_features, num_classes)
+
+    return model
+
+
 def get_model(
-    arch: str = "resnet18",
+    arch: str = "densenet121",
     num_classes: int = 2,
     in_channels: int = 1,
     pretrained: bool = True,
@@ -179,6 +242,7 @@ def get_model(
       - arch='simple'    -> SimpleCNN  (מודל קטן / דיבאג)
       - arch='medium'    -> MediumCNN  (מודל בינוני למחקר)
       - arch='resnet18'  -> ResNet-18 פרה-טריינד (backbone חזק)
+      - arch='densenet121' -> DenseNet-121 פרה-טריינד (backbone חזק יותר ל-X-ray)
 
     פרמטרים:
       arch        : שם הארכיטקטורה ("simple", "medium", "resnet18")
@@ -197,6 +261,13 @@ def get_model(
 
     if arch in ("resnet", "resnet18"):
         return _make_resnet18(
+            num_classes=num_classes,
+            in_channels=in_channels,
+            pretrained=pretrained,
+        )
+
+    if arch in ("densenet", "densenet121"):
+        return _make_densenet121(
             num_classes=num_classes,
             in_channels=in_channels,
             pretrained=pretrained,
