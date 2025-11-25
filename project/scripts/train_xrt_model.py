@@ -41,8 +41,8 @@ from common.utils import get_device
 CKPT_DIR = "/content/drive/MyDrive/XRT_Models"
 MODEL_ARCH = "densenet121"
 BATCH_SIZE = 16
-EPOCHS = 2
-TRANNING_N = 25
+EPOCHS = 5
+TRANNING_N = 50
 LR = 1e-4
 
 
