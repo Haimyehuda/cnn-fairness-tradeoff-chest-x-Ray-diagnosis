@@ -44,19 +44,23 @@ DARK_BLUE = "#004c8c"
 # ---------------------------------------------------------------
 # 1. Paths & imports from project
 # ---------------------------------------------------------------
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))  # .../project/scripts
-PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)  # .../project
-COMMON_PATH = os.path.join(PROJECT_ROOT, "common")
 
-if COMMON_PATH not in sys.path:
-    sys.path.append(COMMON_PATH)
+# .../project/experiments/pre_processing/augmentation_xrt.py
+SCRIPT_DIR = os.path.dirname(
+    os.path.abspath(__file__)
+)  # .../project/experiments/pre_processing
+EXPERIMENTS_DIR = os.path.dirname(SCRIPT_DIR)  # .../project/experiments
+PROJECT_ROOT = os.path.dirname(EXPERIMENTS_DIR)  # .../project
 
-from model import get_model  # מתוך common/model.py
-from utils import get_device, set_seed  # מתוך common/utils.py
-from pipeline.train import train_model  # מתוך common/pipeline/train.py
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
+
+from common.model import get_model  # מתוך common/model.py
+from common.utils import get_device, set_seed  # מתוך common/utils.py
+from common.pipeline.train import train_model  # מתוך common/pipeline/train.py
 
 # נייבא מהסקריפט הקיים את עזרי ה-XRT
-from train_xrt_model import (  # מתוך project/scripts/train_xrt_model.py
+from scripts.train_xrt_model import (  # מתוך project/scripts/train_xrt_model.py
     ChestDataset,
     clean_path,
     CHEXPERT_ROOT,
