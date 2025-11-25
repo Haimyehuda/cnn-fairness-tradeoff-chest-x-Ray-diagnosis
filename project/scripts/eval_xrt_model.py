@@ -17,6 +17,12 @@ import torch
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
+# סגנון כללי "מאמר רפואי"
+plt.style.use("seaborn-v0_8-whitegrid")
+
+MED_BLUE = "#1f77b4"  # כחול עדין
+DARK_BLUE = "#004c8c"  # כחול עמוק לכותרות/קווים
+
 from sklearn.metrics import (
     confusion_matrix,
     classification_report,
@@ -210,6 +216,59 @@ def show_sample_images(eval_df, max_samples: int = 6):
 
 
 # ---------------------------------------------------------------
+# create & save a larger sample grid (no display)
+# ---------------------------------------------------------------
+def save_sample_grid(eval_df, scenario: str, out_dir: str, max_samples: int = 12):
+    """
+    יוצר ושומר תמונה נוספת: גריד של דגימות מהדאטה.
+    מיועד למחקר – "Sample images used in evaluation".
+
+    לא מוצג במסך – רק נשמר כ-PNG.
+    """
+    print(f"=== Saving additional sample grid ({max_samples} images) ===")
+
+    ensure_dir(out_dir)
+
+    if len(eval_df) == 0:
+        print("No samples, grid not created.")
+        return
+
+    n = min(max_samples, len(eval_df))
+    samples = eval_df.sample(n=n, random_state=RANDOM_STATE)
+
+    # בונים גריד 4x3 (תואם 12 תמונות)
+    rows = 3
+    cols = 4
+    fig, axes = plt.subplots(rows, cols, figsize=(14, 9))
+    axes = axes.flatten()
+
+    for ax, (_, row) in zip(axes, samples.iterrows()):
+        try:
+            img = plt.imread(row["abs"])
+            ax.imshow(img, cmap="gray")
+            ax.set_title(CLASS_NAMES[int(row["label"])])
+            ax.axis("off")
+        except:
+            ax.set_title("Error")
+            ax.text(0.5, 0.5, "Error\nloading image", ha="center", va="center")
+            ax.axis("off")
+
+    # מסתיר תאים ריקים אם יש
+    for ax in axes[len(samples) :]:
+        ax.axis("off")
+
+    fig.suptitle(f"Evaluation Sample Grid – {scenario} model", fontsize=14, y=0.98)
+    plt.tight_layout()
+
+    # שמירה לקובץ
+    out_path = os.path.join(out_dir, f"sample_grid_{scenario}.png")
+    plt.savefig(out_path, dpi=200)
+    plt.close(fig)
+
+    print(f"✔ Sample grid saved to: {out_path}")
+
+
+# ---------------------------------------------------------------
 # 4. Load model + checkpoint
 # ---------------------------------------------------------------
 def load_model_and_ckpt(scenario: str):
@@ -347,17 +406,39 @@ def ensure_dir(path: str):
 
 def plot_confusion_matrix(cm, scenario: str, out_dir: str, show: bool = False):
     ensure_dir(out_dir)
-    fig, ax = plt.subplots(figsize=(5, 5))
-    im = ax.imshow(cm, interpolation="nearest", cmap="PuBu")
-    ax.set_title(f"Confusion Matrix – {scenario} model")
-    plt.colorbar(im, ax=ax)
 
+    fig, ax = plt.subplots(figsize=(5.2, 5.2))
+
+    # מפה כחולה עדינה
+    im = ax.imshow(cm, interpolation="nearest", cmap="Blues")
+
+    # כותרת בסגנון מאמר
+    ax.set_title(
+        f"Confusion Matrix – {scenario} model", fontsize=14, color=DARK_BLUE, pad=12
+    )
+
+    # colorbar צר ועדין
+    cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    cbar.ax.tick_params(labelsize=10)
+
+    # תוויות צירים
     tick_marks = np.arange(len(CLASS_NAMES))
     ax.set_xticks(tick_marks)
     ax.set_yticks(tick_marks)
-    ax.set_xticklabels([CLASS_NAMES[i] for i in tick_marks], rotation=45)
-    ax.set_yticklabels([CLASS_NAMES[i] for i in tick_marks])
+    ax.set_xticklabels([CLASS_NAMES[i] for i in tick_marks], rotation=0, fontsize=11)
+    ax.set_yticklabels([CLASS_NAMES[i] for i in tick_marks], fontsize=11)
 
+    # רשת עדינה מעל המטריצה
+    ax.set_xlabel("Predicted label", fontsize=12)
+    ax.set_ylabel("True label", fontsize=12)
+
+    # קווי grid דקים לבנים
+    ax.set_xticks(np.arange(-0.5, len(CLASS_NAMES), 1), minor=True)
+    ax.set_yticks(np.arange(-0.5, len(CLASS_NAMES), 1), minor=True)
+    ax.grid(which="minor", color="white", linestyle="-", linewidth=1)
+    ax.tick_params(which="minor", bottom=False, left=False)
+
+    # מספרים בתוך התאים
     thresh = cm.max() / 2.0
     for i in range(cm.shape[0]):
         for j in range(cm.shape[1]):
@@ -367,15 +448,15 @@ def plot_confusion_matrix(cm, scenario: str, out_dir: str, show: bool = False):
                 format(cm[i, j], "d"),
                 ha="center",
                 va="center",
+                fontsize=12,
+                fontweight="bold",
                 color="white" if cm[i, j] > thresh else "black",
             )
 
-    ax.set_ylabel("True label")
-    ax.set_xlabel("Predicted label")
     plt.tight_layout()
 
     out_path = os.path.join(out_dir, f"confusion_matrix_{scenario}.png")
-    plt.savefig(out_path, dpi=200)
+    plt.savefig(out_path, dpi=300, bbox_inches="tight")
 
     if show:
         plt.show()
@@ -391,17 +472,35 @@ def plot_roc_curve(
     fpr, tpr, thresholds = roc_curve(all_targets, all_probs)
 
     fig = plt.figure(figsize=(6, 5))
-    plt.plot(fpr, tpr, label=f"ROC curve (AUC = {auc:.3f})")
-    plt.plot([0, 1], [0, 1], linestyle="--")
-    plt.xlabel("False Positive Rate")
-    plt.ylabel("True Positive Rate")
-    plt.title(f"ROC – {scenario} model")
-    plt.legend(loc="lower right")
-    plt.grid(True, linestyle=":")
+
+    # קו ROC כחול, עבה יחסית
+    plt.plot(
+        fpr,
+        tpr,
+        label=f"AUC = {auc:.3f}",
+        color=MED_BLUE,
+        linewidth=2.2,
+    )
+
+    # האלכסון (מודל אקראי) באפור עדין
+    plt.plot(
+        [0, 1], [0, 1], linestyle="--", color="grey", linewidth=1.2, label="Random"
+    )
+
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.02])
+
+    plt.xlabel("False Positive Rate", fontsize=12)
+    plt.ylabel("True Positive Rate", fontsize=12)
+    plt.title(f"ROC Curve – {scenario} model", fontsize=14, color=DARK_BLUE, pad=10)
+
+    plt.legend(loc="lower right", fontsize=11, frameon=True, framealpha=0.9)
+    plt.grid(True, linestyle=":", linewidth=0.7, alpha=0.8)
+
     plt.tight_layout()
 
     out_path = os.path.join(out_dir, f"roc_{scenario}.png")
-    plt.savefig(out_path, dpi=200)
+    plt.savefig(out_path, dpi=300, bbox_inches="tight")
 
     if show:
         plt.show()
@@ -418,16 +517,39 @@ def plot_tpr_bars(report_dict, scenario: str, out_dir: str, show: bool = False):
     ]
 
     fig = plt.figure(figsize=(5, 4))
-    plt.bar(list(CLASS_NAMES.values()), tprs)
-    for i, v in enumerate(tprs):
-        plt.text(i, v + 0.01, f"{v:.2f}", ha="center", va="bottom")
+
+    bars = plt.bar(
+        list(CLASS_NAMES.values()),
+        tprs,
+        color=MED_BLUE,
+        edgecolor="black",
+        linewidth=0.7,
+    )
+
+    # כיתוב על העמודות
+    for bar, v in zip(bars, tprs):
+        height = bar.get_height()
+        plt.text(
+            bar.get_x() + bar.get_width() / 2.0,
+            height + 0.015,
+            f"{v:.2f}",
+            ha="center",
+            va="bottom",
+            fontsize=11,
+        )
+
     plt.ylim(0, 1.05)
-    plt.ylabel("Recall (TPR)")
-    plt.title(f"Per-class TPR – {scenario} model")
+    plt.ylabel("Recall (TPR)", fontsize=12)
+    plt.title(f"Per-class TPR – {scenario} model", fontsize=14, color=DARK_BLUE, pad=10)
+
+    # רק גריד אופקי עדין
+    plt.grid(axis="y", linestyle=":", linewidth=0.7, alpha=0.8)
+    plt.grid(axis="x", visible=False)
+
     plt.tight_layout()
 
     out_path = os.path.join(out_dir, f"tpr_{scenario}.png")
-    plt.savefig(out_path, dpi=200)
+    plt.savefig(out_path, dpi=300, bbox_inches="tight")
 
     if show:
         plt.show()
@@ -474,6 +596,7 @@ def main():
     plot_confusion_matrix(cm, args.scenario, out_dir, show=args.show)
     plot_roc_curve(all_targets, all_probs, auc, args.scenario, out_dir, show=args.show)
     plot_tpr_bars(report_dict, args.scenario, out_dir, show=args.show)
+    save_sample_grid(eval_df, args.scenario, out_dir, max_samples=12)
 
     print("\n✅ Finished XRT evaluation script.")
 
