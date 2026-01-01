@@ -190,7 +190,14 @@ def main():
     # -----------------------------
     # Evaluation
     # -----------------------------
-    metrics = evaluate_model(model=model, dataloader=eval_loader, device=device)
+    metrics = evaluate_model(
+        model=model,
+        dataloader=eval_loader,
+        device=device,
+        make_plots=True,
+        plots_dir="/content/plots",
+        run_name=scenario["name"],
+    )
 
     # -----------------------------
     # Build results row
