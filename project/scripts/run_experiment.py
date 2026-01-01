@@ -125,9 +125,12 @@ def main():
     # Load CheXpert metadata
     # -----------------------------
     df = pd.read_csv(os.path.join(CHEXPERT_ROOT, "train.csv"))
-
     df["label"] = np.where(df["Pneumonia"] == 1, POS_LABEL, NEG_LABEL)
-    df["image_path"] = df["Path"].apply(lambda p: os.path.join(CHEXPERT_ROOT, p))
+
+    # Path is relative to /content/chexpert
+    df["image_path"] = df["Path"].apply(
+        lambda p: os.path.join(CHEXPERT_ROOT, p.lstrip("/"))
+    )
 
     # Exclude eval samples from training pool
     train_pool = df[~df["image_path"].isin(eval_paths)]
