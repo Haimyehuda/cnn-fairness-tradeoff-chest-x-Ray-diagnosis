@@ -129,7 +129,9 @@ def main():
 
     # Path is relative to /content/chexpert
     df["image_path"] = df["Path"].apply(
-        lambda p: os.path.join(CHEXPERT_ROOT, p.lstrip("/"))
+        lambda p: os.path.join(
+            CHEXPERT_ROOT, p.replace("CheXpert-v1.0-small/", "").lstrip("/")
+        )
     )
 
     # Exclude eval samples from training pool
