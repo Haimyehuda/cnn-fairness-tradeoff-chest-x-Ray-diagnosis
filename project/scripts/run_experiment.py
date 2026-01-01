@@ -176,7 +176,7 @@ def main():
     # -----------------------------
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = get_model(MODEL_ARCH, num_classes=2).to(device)
+    model = get_model(num_classes=2).to(device)
 
     train_model(
         model=model, train_loader=train_loader, device=device, epochs=EPOCHS, lr=LR
