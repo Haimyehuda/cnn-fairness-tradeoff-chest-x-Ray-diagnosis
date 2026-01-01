@@ -25,6 +25,11 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+COMMON_PATH = os.path.join(PROJECT_ROOT, "common")
+
+sys.path.insert(0, COMMON_PATH)
+
 # -----------------------------
 # Project imports
 # -----------------------------
