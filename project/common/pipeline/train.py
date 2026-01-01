@@ -1,85 +1,49 @@
+"""
+train.py
+========
+
+Training utilities for binary classification models.
+
+Responsibilities:
+- Train a model for a fixed number of epochs
+- Return the trained model
+"""
+
 import torch
-import time
-
-# AMP only if CUDA is available
-AMP_AVAILABLE = torch.cuda.is_available()
-if AMP_AVAILABLE:
-    from torch.cuda.amp import GradScaler, autocast
-
-
-def train_one_epoch(model, loader, optimizer, criterion, device, epoch, epochs):
-    model.train()
-    total_loss = 0.0
-
-    use_amp = AMP_AVAILABLE  # disable AMP on CPU
-    scaler = GradScaler(enabled=use_amp) if use_amp else None
-
-    epoch_start = time.time()
-    num_batches = len(loader)
-
-    print(f"\n🚀 Starting epoch {epoch}/{epochs} ({num_batches} batches)")
-
-    for i, (x, y) in enumerate(loader):
-        x, y = x.to(device), y.to(device)
-        optimizer.zero_grad()
-
-        if use_amp:
-            with autocast():
-                logits = model(x)
-                loss = criterion(logits, y)
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            logits = model(x)
-            loss = criterion(logits, y)
-            loss.backward()
-            optimizer.step()
-
-        total_loss += loss.item()
-
-        # ---- progress print every 20 steps ----
-        if (i + 1) % 20 == 0 or (i + 1) == num_batches:
-            elapsed = time.time() - epoch_start
-            avg_step = elapsed / (i + 1)
-            remaining = avg_step * (num_batches - (i + 1))
-            print(
-                f"  Batch {i+1}/{num_batches} | "
-                f"Loss: {loss.item():.4f} | "
-                f"ETA: {remaining:.1f}s"
-            )
-
-    epoch_time = time.time() - epoch_start
-    avg_loss = total_loss / num_batches
-
-    print(
-        f"✅ Epoch {epoch}/{epochs} finished | Loss={avg_loss:.4f} | Time={epoch_time:.1f}s"
-    )
-
-    return avg_loss
+from torch import nn
+from torch.optim import Adam
 
 
 def train_model(
-    model,
+    model: torch.nn.Module,
     train_loader,
-    device,
-    lr=1e-4,
-    epochs=10,
-    class_weights=None,
-):
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    device: torch.device,
+    epochs: int = 10,
+    lr: float = 1e-4,
+) -> None:
+    """
+    Train a model using cross-entropy loss.
 
-    if class_weights is not None:
-        criterion = torch.nn.CrossEntropyLoss(weight=class_weights.to(device))
-    else:
-        criterion = torch.nn.CrossEntropyLoss()
+    Args:
+        model (nn.Module): Model to train
+        train_loader: DataLoader for training data
+        device (torch.device): CPU or CUDA device
+        epochs (int): Number of training epochs
+        lr (float): Learning rate
+    """
 
-    history = {"loss": []}
+    model.train()
 
-    for epoch in range(1, epochs + 1):
-        loss = train_one_epoch(
-            model, train_loader, optimizer, criterion, device, epoch, epochs
-        )
-        history["loss"].append(loss)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = Adam(model.parameters(), lr=lr)
 
-    return model, history
+    for epoch in range(epochs):
+        for images, labels in train_loader:
+            images = images.to(device)
+            labels = labels.to(device)
+
+            optimizer.zero_grad()
+            logits = model(images)
+            loss = criterion(logits, labels)
+            loss.backward()
+            optimizer.step()
