@@ -10,7 +10,7 @@ Computes (numeric):
 - Fairness gaps: ΔTPR (Equal Opportunity), ΔFPR (Equalized Odds)
 - Disparate Impact (DI)
 
-Optionally produces (visual):
+Optionally produces (visual) in a consistent medical-paper style:
 - Confusion matrix (counts + normalized)
 - ROC curve + AUC
 - Precision–Recall curve + AP
@@ -35,6 +35,35 @@ from sklearn.metrics import (
     average_precision_score,
 )
 
+# -----------------------------
+# Medical paper style (single, consistent)
+# -----------------------------
+_COLOR_MAIN = "#1f3a5f"  # medical navy
+_COLOR_REF = "#9aa5b1"  # soft grey
+_GRAY_DARK = "#4b5563"  # dark grey
+_GRAY_LIGHT = "#b0b7c3"  # light grey
+
+
+def _apply_medical_style() -> None:
+    """Apply a unified, journal-like style to all plots."""
+    plt.rcParams.update(
+        {
+            "figure.dpi": 120,
+            "savefig.dpi": 220,
+            "font.size": 12,
+            "axes.titlesize": 16,
+            "axes.labelsize": 13,
+            "axes.titleweight": "semibold",
+            "axes.grid": True,
+            "grid.alpha": 0.25,
+            "grid.linewidth": 0.6,
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+            "legend.frameon": False,
+            "lines.linewidth": 2.2,
+        }
+    )
+
 
 def _ensure_dir(path: str) -> None:
     if path:
@@ -42,16 +71,16 @@ def _ensure_dir(path: str) -> None:
 
 
 def _savefig(path: str) -> None:
-    # Save without blocking Colab output; close to avoid memory leaks
+    # Save without blocking notebook output; close to avoid memory leaks
     plt.tight_layout()
-    plt.savefig(path, dpi=200, bbox_inches="tight")
+    plt.savefig(path, dpi=220, bbox_inches="tight")
     plt.close()
 
 
 def _plot_confusion(cm: np.ndarray, title: str, out_path: str) -> None:
-    # Simple heatmap without seaborn
+    # Counts confusion matrix (journal-like grayscale)
     plt.figure()
-    plt.imshow(cm, interpolation="nearest")
+    plt.imshow(cm, interpolation="nearest", cmap="Greys")
     plt.title(title)
     plt.xlabel("Predicted")
     plt.ylabel("True")
@@ -60,18 +89,18 @@ def _plot_confusion(cm: np.ndarray, title: str, out_path: str) -> None:
 
     # Annotate cells
     for (i, j), v in np.ndenumerate(cm):
-        plt.text(j, i, str(int(v)), ha="center", va="center")
+        plt.text(j, i, str(int(v)), ha="center", va="center", color="black")
 
     _savefig(out_path)
 
 
 def _plot_confusion_norm(cm: np.ndarray, title: str, out_path: str) -> None:
-    # Row-normalized confusion matrix (per-true-class)
+    # Row-normalized confusion matrix (per-true-class, soft blues)
     row_sums = cm.sum(axis=1, keepdims=True) + 1e-12
     cmn = cm / row_sums
 
     plt.figure()
-    plt.imshow(cmn, interpolation="nearest", vmin=0.0, vmax=1.0)
+    plt.imshow(cmn, interpolation="nearest", cmap="Blues", vmin=0.0, vmax=1.0)
     plt.title(title)
     plt.xlabel("Predicted")
     plt.ylabel("True")
@@ -79,7 +108,7 @@ def _plot_confusion_norm(cm: np.ndarray, title: str, out_path: str) -> None:
     plt.yticks([0, 1], ["NORMAL(0)", "PNEUMONIA(1)"])
 
     for (i, j), v in np.ndenumerate(cmn):
-        plt.text(j, i, f"{v:.2f}", ha="center", va="center")
+        plt.text(j, i, f"{v:.2f}", ha="center", va="center", color="black")
 
     _savefig(out_path)
 
@@ -92,8 +121,8 @@ def _plot_roc(
     auc = roc_auc_score(y_true, y_score)
 
     plt.figure()
-    plt.plot(fpr, tpr)
-    plt.plot([0, 1], [0, 1], linestyle="--")
+    plt.plot(fpr, tpr, color=_COLOR_MAIN)
+    plt.plot([0, 1], [0, 1], linestyle="--", color=_COLOR_REF, linewidth=1.2)
     plt.title(f"{title} (AUC={auc:.3f})")
     plt.xlabel("False Positive Rate")
     plt.ylabel("True Positive Rate")
@@ -109,7 +138,7 @@ def _plot_pr(
     ap = average_precision_score(y_true, y_score)
 
     plt.figure()
-    plt.plot(recall, precision)
+    plt.plot(recall, precision, color=_COLOR_MAIN)
     plt.title(f"{title} (AP={ap:.3f})")
     plt.xlabel("Recall")
     plt.ylabel("Precision")
@@ -119,7 +148,7 @@ def _plot_pr(
 
 
 def _plot_class_bars(metrics: dict, title: str, out_path: str) -> None:
-    # Compact bar chart for key per-class metrics
+    # Compact bar chart for key per-class metrics (muted greys + hatch)
     labels = ["Accuracy", "TPR", "FPR", "F1"]
     normal_vals = [
         metrics["acc_normal"],
@@ -138,8 +167,23 @@ def _plot_class_bars(metrics: dict, title: str, out_path: str) -> None:
     width = 0.35
 
     plt.figure()
-    plt.bar(x - width / 2, normal_vals, width, label="NORMAL(0)")
-    plt.bar(x + width / 2, pneu_vals, width, label="PNEUMONIA(1)")
+    plt.bar(
+        x - width / 2,
+        normal_vals,
+        width,
+        label="NORMAL(0)",
+        color=_GRAY_DARK,
+        alpha=0.95,
+    )
+    plt.bar(
+        x + width / 2,
+        pneu_vals,
+        width,
+        label="PNEUMONIA(1)",
+        color=_GRAY_LIGHT,
+        alpha=0.95,
+        hatch="//",
+    )
     plt.xticks(x, labels)
     plt.ylim(0, 1)
     plt.title(title)
@@ -165,7 +209,6 @@ def evaluate_model(
         model: Trained model
         dataloader: DataLoader for evaluation data
         device: CPU or CUDA device
-
         return_outputs: if True, returns y_true/y_pred/y_score for downstream analysis
         make_plots: if True, saves plots to plots_dir (PNG)
         plots_dir: directory to save plots (required when make_plots=True)
@@ -224,9 +267,7 @@ def evaluate_model(
 
     # For PNEUMONIA (class 1), recall = TP / (TP+FN)
     tpr_pneumonia = float(TP / (TP + FN + 1e-12))
-    fpr_pneumonia = float(
-        FN / (TP + FN + 1e-12)
-    )  # (kept consistent with your original code)
+    fpr_pneumonia = float(FN / (TP + FN + 1e-12))  # kept consistent with your code
 
     # Fairness gaps
     delta_tpr = float(abs(tpr_normal - tpr_pneumonia))
@@ -268,7 +309,6 @@ def evaluate_model(
         "delta_tpr": delta_tpr,
         "delta_fpr": delta_fpr,
         "disparate_impact": disparate_impact,
-        # Extra: include confusion matrix for easy reporting
         "cm": cm,
     }
 
@@ -278,6 +318,7 @@ def evaluate_model(
     if make_plots:
         assert plots_dir, "plots_dir must be provided when make_plots=True"
         _ensure_dir(plots_dir)
+        _apply_medical_style()
 
         # Confusion matrices
         _plot_confusion(
