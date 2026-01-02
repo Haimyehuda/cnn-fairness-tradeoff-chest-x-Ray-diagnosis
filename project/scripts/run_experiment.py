@@ -190,12 +190,16 @@ def main():
     # -----------------------------
     # Evaluation
     # -----------------------------
+    PLOTS_ROOT = "/content/drive/MyDrive/cnn_fairness_experiments"
+
+    plots_dir = os.path.join(PLOTS_ROOT, scenario["name"])
+
     metrics = evaluate_model(
         model=model,
         dataloader=eval_loader,
         device=device,
         make_plots=True,
-        plots_dir="/content/plots",
+        plots_dir=plots_dir,
         run_name=scenario["name"],
     )
 
