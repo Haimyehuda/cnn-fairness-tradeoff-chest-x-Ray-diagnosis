@@ -24,11 +24,13 @@ import pandas as pd
 import torch
 import sys
 
+from experiment_logger import log_experiment_to_sheets
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 COMMON_PATH = os.path.join(PROJECT_ROOT, "common")
+EXPERIMENT_SHEET_ID = "1pA7K5EG36SCPi-jZEzb1wVFAP1S9TEVLZ0ogps2Bff0"
 
 sys.path.insert(0, COMMON_PATH)
 
@@ -233,6 +235,18 @@ def main():
     else:
         df_row.to_csv(RESULTS_PATH, index=False)
 
+    # -----------------------------
+    # Persist results to Google Sheets
+    # -----------------------------
+    try:
+        log_experiment_to_sheets(row, EXPERIMENT_SHEET_ID)
+        print("✔ Results appended to Google Sheets")
+    except Exception as e:
+        print("⚠️ Failed to write to Google Sheets:", e)
+
+    # -----------------------------
+    # Final confirmation
+    # -----------------------------
     print("\n✔ Experiment completed successfully")
     print(df_row)
 
