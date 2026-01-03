@@ -24,23 +24,33 @@ import pandas as pd
 import torch
 import sys
 
-from experiment_logger import log_experiment_to_sheets
-from torch.utils.data import DataLoader
-from torchvision import transforms
-
+# -----------------------------
+# Resolve project paths FIRST
+# -----------------------------
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 COMMON_PATH = os.path.join(PROJECT_ROOT, "common")
-EXPERIMENT_SHEET_ID = "1pA7K5EG36SCPi-jZEzb1wVFAP1S9TEVLZ0ogps2Bff0"
 
 sys.path.insert(0, COMMON_PATH)
 
 # -----------------------------
-# Project imports
+# Standard / third-party imports
 # -----------------------------
+from torch.utils.data import DataLoader
+from torchvision import transforms
+
+# -----------------------------
+# Project imports (now visible)
+# -----------------------------
+from experiment_logger import log_experiment_to_sheets
 from dataset import XRTDataset
 from model import get_model
 from pipeline.train import train_model
 from pipeline.eval import evaluate_model
+
+# -----------------------------
+# Research constants
+# -----------------------------
+EXPERIMENT_SHEET_ID = "1pA7K5EG36SCPi-jZEzb1wVFAP1S9TEVLZ0ogps2Bff0"
 
 # -----------------------------
 # Scenario definitions
