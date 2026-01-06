@@ -88,9 +88,14 @@ def _plot_confusion(cm: np.ndarray, title: str, out_path: str) -> None:
     plt.yticks([0, 1], ["NORMAL(0)", "PNEUMONIA(1)"])
 
     # Annotate cells
-    for (i, j), v in np.ndenumerate(cm):
-        plt.text(j, i, str(int(v)), ha="center", va="center", color="black")
+    # Dynamic text color for visibility
+    threshold = cm.max() / 2.0
 
+    for (i, j), v in np.ndenumerate(cm):
+        color = "white" if v > threshold else "black"
+        plt.text(
+            j, i, str(int(v)), ha="center", va="center", color=color, fontweight="bold"
+        )
     _savefig(out_path)
 
 
