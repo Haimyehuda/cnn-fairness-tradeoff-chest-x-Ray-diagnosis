@@ -39,8 +39,6 @@ def log_experiment(results: Dict[str, float], output_path: str) -> None:
 # --------------------------------------------------
 # Google Sheets logging
 # --------------------------------------------------
-import gspread
-from google.auth import default
 
 
 def log_experiment_to_sheets(row: dict, sheet_id: str) -> None:

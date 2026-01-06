@@ -1,21 +1,24 @@
-# project/experiments/pre_processing/augmentation.py
 """
 Augmentation Experiment (Pre-processing)
 
 This script runs a controlled experiment using Data Augmentation
 as a pre-processing fairness mitigation technique.
 
-Key principles:
+Research guarantees:
 - DOES NOT modify the baseline run_experiment.py
-- Uses the same scenarios definition
-- Uses the same evaluation reference (locked eval set)
+- Uses the same SCENARIOS definition
+- Uses the same LOCKED evaluation reference set
 - Applies augmentation ONLY to the TRAIN set
-- Logs results with a clear _AUG suffix
+- Logs results consistently to:
+  - Persistent CSV (Google Drive)
+  - Google Sheets (shared research ledger)
+
+The experiment is fully reproducible and protocol-aligned.
 """
 
-# -----------------------------
+# ===============================================================
 # Standard imports
-# -----------------------------
+# ===============================================================
 import os
 import sys
 import argparse
@@ -26,9 +29,9 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-# -----------------------------
-# Path setup (CRITICAL)
-# -----------------------------
+# ===============================================================
+# Path setup (CRITICAL – mirrors project conventions)
+# ===============================================================
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 COMMON_PATH = os.path.join(PROJECT_ROOT, "common")
@@ -36,18 +39,19 @@ COMMON_PATH = os.path.join(PROJECT_ROOT, "common")
 sys.path.insert(0, PROJECT_ROOT)
 sys.path.insert(0, COMMON_PATH)
 
-# -----------------------------
+# ===============================================================
 # Project imports
-# -----------------------------
+# ===============================================================
 from scripts.scenarios import SCENARIOS
 from dataset import XRTDataset
 from model import get_model
 from pipeline.train import train_model
 from pipeline.eval import evaluate_model
+from experiment_logger import log_experiment_to_sheets
 
-# -----------------------------
-# Global research constants
-# -----------------------------
+# ===============================================================
+# Global research constants (MUST match baseline)
+# ===============================================================
 SEED = 42
 MODEL_ARCH = "densenet121"
 BATCH_SIZE = 16
@@ -56,15 +60,22 @@ LR = 1e-4
 
 CHEXPERT_ROOT = "/content/chexpert"
 EVAL_INDEX_PATH = "/content/eval_reference/eval_index.csv"
-RESULTS_PATH = "/content/results_table.csv"
+
+# Persistent storage (Drive)
+DRIVE_ROOT = "/content/drive/MyDrive/cnn_fairness_experiments"
+os.makedirs(DRIVE_ROOT, exist_ok=True)
+RESULTS_PATH = os.path.join(DRIVE_ROOT, "results_table.csv")
+
+# Google Sheets (global research ledger)
+EXPERIMENT_SHEET_ID = "1pA7K5EG36SCPi-jZEzb1wVFAP1S9TEVLZ0ogps2Bff0"
 
 POS_LABEL = "PNEUMONIA"
 NEG_LABEL = "NORMAL"
 
 
-# -----------------------------
+# ===============================================================
 # Argument parsing
-# -----------------------------
+# ===============================================================
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Run pre-processing augmentation experiment"
@@ -78,23 +89,23 @@ def parse_args():
     return parser.parse_args()
 
 
-# -----------------------------
+# ===============================================================
 # Main experiment logic
-# -----------------------------
+# ===============================================================
 def main():
     args = parse_args()
     scenario = SCENARIOS[args.scenario]
 
-    # -----------------------------
+    # -----------------------------------------------------------
     # Reproducibility
-    # -----------------------------
+    # -----------------------------------------------------------
     np.random.seed(SEED)
     torch.manual_seed(SEED)
     torch.cuda.manual_seed_all(SEED)
 
-    # -----------------------------
+    # -----------------------------------------------------------
     # Load evaluation reference (LOCKED)
-    # -----------------------------
+    # -----------------------------------------------------------
     assert os.path.exists(
         EVAL_INDEX_PATH
     ), "Evaluation reference not found. Run Eval init first."
@@ -102,26 +113,27 @@ def main():
     eval_df = pd.read_csv(EVAL_INDEX_PATH)
     eval_paths = set(eval_df["image_path"])
 
-    # -----------------------------
+    # -----------------------------------------------------------
     # Load CheXpert metadata
-    # -----------------------------
+    # -----------------------------------------------------------
     df = pd.read_csv(os.path.join(CHEXPERT_ROOT, "train.csv"))
     df["label"] = np.where(df["Pneumonia"] == 1, POS_LABEL, NEG_LABEL)
 
     df["image_path"] = df["Path"].apply(
         lambda p: os.path.join(
-            CHEXPERT_ROOT, p.replace("CheXpert-v1.0-small/", "").lstrip("/")
+            CHEXPERT_ROOT,
+            p.replace("CheXpert-v1.0-small/", "").lstrip("/"),
         )
     )
 
-    # -----------------------------
+    # -----------------------------------------------------------
     # Exclude eval samples from training pool
-    # -----------------------------
+    # -----------------------------------------------------------
     train_pool = df[~df["image_path"].isin(eval_paths)]
 
-    # -----------------------------
+    # -----------------------------------------------------------
     # Build TRAIN set (scenario-specific)
-    # -----------------------------
+    # -----------------------------------------------------------
     rng = np.random.RandomState(SEED)
 
     train_pos = train_pool[train_pool["label"] == POS_LABEL].sample(
@@ -141,9 +153,9 @@ def main():
     print("  NORMAL   :", (train_df["label"] == NEG_LABEL).sum())
     print("  TOTAL    :", len(train_df))
 
-    # -----------------------------
+    # -----------------------------------------------------------
     # Transforms
-    # -----------------------------
+    # -----------------------------------------------------------
     train_transform = transforms.Compose(
         [
             transforms.Resize((224, 224)),
@@ -163,20 +175,19 @@ def main():
         ]
     )
 
-    # -----------------------------
+    # -----------------------------------------------------------
     # Dataset & loaders
-    # -----------------------------
+    # -----------------------------------------------------------
     train_ds = XRTDataset(train_df, transform=train_transform)
     eval_ds = XRTDataset(eval_df, transform=eval_transform)
 
     train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True)
     eval_loader = DataLoader(eval_ds, batch_size=BATCH_SIZE, shuffle=False)
 
-    # -----------------------------
+    # -----------------------------------------------------------
     # Model training
-    # -----------------------------
+    # -----------------------------------------------------------
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     model = get_model(num_classes=2).to(device)
 
     train_model(
@@ -187,11 +198,10 @@ def main():
         lr=LR,
     )
 
-    # -----------------------------
+    # -----------------------------------------------------------
     # Evaluation
-    # -----------------------------
-    PLOTS_ROOT = "/content/drive/MyDrive/cnn_fairness_experiments"
-    plots_dir = os.path.join(PLOTS_ROOT, scenario["name"] + "_AUG")
+    # -----------------------------------------------------------
+    plots_dir = os.path.join(DRIVE_ROOT, scenario["name"] + "_AUG")
 
     metrics = evaluate_model(
         model=model,
@@ -202,9 +212,9 @@ def main():
         run_name=scenario["name"] + "_AUG",
     )
 
-    # -----------------------------
-    # Build results row
-    # -----------------------------
+    # -----------------------------------------------------------
+    # Build results row (schema MUST match baseline)
+    # -----------------------------------------------------------
     row = {
         "Experiment": scenario["name"] + "_AUG",
         "Train Ratio (P/N)": f"{scenario['n_pneumonia']}/{scenario['n_normal']}",
@@ -222,9 +232,9 @@ def main():
         "Disparate Impact (DI)": metrics["disparate_impact"],
     }
 
-    # -----------------------------
-    # Persist results (CSV)
-    # -----------------------------
+    # -----------------------------------------------------------
+    # Persist results to CSV (Drive)
+    # -----------------------------------------------------------
     df_row = pd.DataFrame([row])
 
     if os.path.exists(RESULTS_PATH):
@@ -232,6 +242,18 @@ def main():
     else:
         df_row.to_csv(RESULTS_PATH, index=False)
 
+    # -----------------------------------------------------------
+    # Persist results to Google Sheets
+    # -----------------------------------------------------------
+    try:
+        log_experiment_to_sheets(row, EXPERIMENT_SHEET_ID)
+        print("✔ Results appended to Google Sheets")
+    except Exception as e:
+        print("⚠️ Failed to write to Google Sheets:", e)
+
+    # -----------------------------------------------------------
+    # Final confirmation
+    # -----------------------------------------------------------
     print("\n✔ Augmentation experiment completed successfully")
     print(df_row)
 
