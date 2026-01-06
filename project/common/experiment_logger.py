@@ -16,10 +16,7 @@ import pandas as pd
 from typing import Dict
 
 
-def log_experiment(
-    results: Dict[str, float],
-    output_path: str,
-) -> None:
+def log_experiment(results: Dict[str, float], output_path: str) -> None:
     """
     Append a single experiment result to a CSV file.
 
@@ -47,14 +44,17 @@ from google.auth import default
 
 
 def log_experiment_to_sheets(row: dict, sheet_id: str) -> None:
-    """
-    Append a single experiment row to Google Sheets.
-    Assumes header already exists and matches row.keys() order.
-    """
+    import gspread
+    from google.auth import default
+
     creds, _ = default()
     gc = gspread.authorize(creds)
 
     sh = gc.open_by_key(sheet_id)
-    ws = sh.sheet1  # gid=0
+    ws = sh.sheet1
+
+    # אם הגיליון ריק – כתוב Header
+    if ws.row_count == 0 or ws.get_all_values() == []:
+        ws.append_row(list(row.keys()), value_input_option="USER_ENTERED")
 
     ws.append_row(list(row.values()), value_input_option="USER_ENTERED")

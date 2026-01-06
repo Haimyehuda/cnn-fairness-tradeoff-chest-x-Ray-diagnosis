@@ -89,7 +89,11 @@ LR = 1e-4
 
 CHEXPERT_ROOT = "/content/chexpert"
 EVAL_INDEX_PATH = "/content/eval_reference/eval_index.csv"
-RESULTS_PATH = "/content/results_table.csv"
+
+DRIVE_ROOT = "/content/drive/MyDrive/cnn_fairness_experiments"
+os.makedirs(DRIVE_ROOT, exist_ok=True)
+
+RESULTS_PATH = os.path.join(DRIVE_ROOT, "results_table.csv")
 
 POS_LABEL = "PNEUMONIA"
 NEG_LABEL = "NORMAL"
