@@ -27,7 +27,7 @@ Key design choices:
 
 import torch
 import torch.nn as nn
-from torchvision.models import densenet121
+from torchvision.models import densenet121, DenseNet121_Weights
 
 
 def get_model(num_classes: int = 2, pretrained: bool = True) -> nn.Module:
@@ -53,7 +53,8 @@ def get_model(num_classes: int = 2, pretrained: bool = True) -> nn.Module:
     # ---------------------------------------------------------
     # Load base DenseNet-121 architecture
     # ---------------------------------------------------------
-    model = densenet121(pretrained=pretrained)
+    weights = DenseNet121_Weights.DEFAULT if pretrained else None
+    model = densenet121(weights=weights)
 
     # ---------------------------------------------------------
     # Adapt first convolution layer for Grayscale input
