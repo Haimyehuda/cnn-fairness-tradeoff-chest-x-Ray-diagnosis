@@ -1,65 +1,88 @@
-# cnn-fairness-tradeoff-chest-x-Ray-diagnosis
+# Fairness vs. Accuracy in CNNs
 
-> > > > > > > a12c639feb53bcaf99bb2a20f2c863b304ef5a98
-> > > > > > > 📌 בחירת מודל (Model Architecture)
+This project presents an empirical study examining the trade-off between model performance (Accuracy) and fairness in convolutional neural networks (CNNs), using chest X-ray images for binary classification (NORMAL vs. PNEUMONIA).
 
-הפרויקט משתמש במנגנון בחירת מודלים גמיש (get_model) המאפשר לבחור בין שלוש ארכיטקטורות CNN שונות עבור כל ניסוי, ללא שינוי בקוד האימון או ההערכה:
+## Research Objective
 
-ארכיטקטורות נתמכות
-arch תיאור שימוש מומלץ
-simple מודל CNN קטן ומהיר דיבאג, בדיקות מהירות
-medium מודל בינוני למצבי מחקר ניסויי Fairness–Accuracy Trade-Off
-resnet18 ResNet-18 פרה-טריינד (ImageNet) התוצאות החזקות ביותר / ניסויי עומק
-חשוב:
+The study aims to analyze how class imbalance in training data affects:
 
-בכל נוטבוק בוחרים את ה־arch ידנית, למשל:
+- Overall model performance
+- Per-class performance
+- Statistical fairness metrics
+- The trade-off between accuracy and fairness
 
-arch = "medium" # simple / medium / resnet18
-in_channels = 1 # X-ray is grayscale
+## Methodology
 
-model = get_model(
-arch=arch,
-num_classes=2,
-in_channels=in_channels,
-pretrained=True
-)
+- Fixed model architecture: DenseNet-121
+- Transfer Learning with ImageNet pre-trained weights
+- Adaptation to grayscale input (single channel)
+- Fixed and balanced evaluation set (1500 NORMAL, 1500 PNEUMONIA)
+- Each experiment trains a new model from scratch
+- No use of checkpoints or model reuse
+- Training configuration remains constant across experiments
 
-הבחירה נעשית לכל ניסוי בנפרד, כדי לוודא השוואה הוגנת בין שיטות איזון נתונים.
+## Experimental Scenarios
 
-📌 התאמה ל־X-Ray (ערוץ אחד)
+| Scenario | PNEUMONIA | NORMAL |
+|----------|----------|--------|
+| 50-50    | 1500     | 1500   |
+| 60-40    | 1500     | 1000   |
+| 10-90    | 1500     | 166    |
+| 1-99     | 1500     | 15     |
 
-כל המודלים בפרויקט תומכים ב־in_channels=1:
+Each scenario represents a different level of class imbalance in the training data.
 
-SimpleCNN ו־MediumCNN בנויים מראש לתמיכה ב־1–3 ערוצים.
+## Evaluation Metrics
 
-ב־ResNet-18 (pretrained) המשקלים ל־Conv1 מותאמים חכם לערוץ יחיד:
+The following metrics are computed:
 
-אם in_channels=1 → ממוצע משקלי RGB נחקר לערוץ יחיד.
+- Accuracy (overall and per class)
+- F1-score (per class)
+- True Positive Rate (TPR / Recall)
+- False Positive Rate (FPR)
+- Equal Opportunity Gap (ΔTPR)
+- Equalized Odds Gap (ΔFPR)
+- Disparate Impact (DI)
 
-נשמרת האיכות של משקלים פרה־טריינד.
+In addition, the following visualizations are generated:
 
-בתוך כל Notebook חשוב לשמור התאמה בין הדאטה למודל:
+- Confusion Matrix (counts and normalized)
+- ROC Curve (with AUC)
+- Precision–Recall Curve (with AP)
+- Per-class performance comparison
 
-train_ds = load_balanced_chestxray(root=CHEXPERT_ROOT, split="train", in_channels=1)
-test_ds = load_balanced_chestxray(root=CHEXPERT_ROOT, split="valid", in_channels=1)
+## Project Structure
 
-📌 יישור קו בקבצי הקוד (dataset/train/eval)
-dataset.py
+project/
+  common/
+    config.py
+    dataset.py
+    model.py
+    utils.py
+    experiment_logger.py
+    pipeline/
+      train.py
+      eval.py
 
-כבר תומך ב־in_channels.
-נדרש רק להעביר את אותו ערך שנבחר למודל.
-אין צורך לשנות את הקובץ.
+  scripts/
+    scenarios.py
+    run_experiment.py
 
-train.py
+  experiments/
+    pre_processing/
+      augmentation.py
 
-אימון גנרי לגמרי — עובד לכל ארכיטקטורה.
-תומך ב־class weights ו־AMP.
-אין צורך לשנות.
+## Running Experiments
 
-eval.py
+To execute a baseline experiment:
 
-אינו תלוי במודל — מחשב Accuracy, Per-class accuracy, Fairness metrics.
-אין צורך לשנות.
+```bash
+cd project
+python scripts/run_experiment.py --scenario 50-50
+python scripts/run_experiment.py --scenario 60-40
+python scripts/run_experiment.py --scenario 10-90
+python scripts/run_experiment.py --scenario 1-99
 
-👈 מסקנה כוללת:
-אחרי התאמות model.py — הפרויקט כולו תומך באופן מלא ב־arch משתנה וב־in_channels גמיש ללא צורך בשינוי בקבצי ה־dataset/train/eval.
+### Augmentation Experiment
+python experiments/pre_processing/augmentation.py --scenario 50-50
+```

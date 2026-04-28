@@ -327,7 +327,7 @@ def evaluate_model(
         _apply_medical_style()
 
         # Confusion matrices
-        title_prefix = f"{research_title} | " if research_title else run_name
+        title_prefix = f"{research_title} | " if research_title else ""
         _plot_confusion(
             cm,
             f"{title_prefix}{run_name} | Confusion Matrix (Counts)",
