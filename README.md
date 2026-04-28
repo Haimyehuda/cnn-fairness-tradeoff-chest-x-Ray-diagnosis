@@ -79,10 +79,10 @@ To execute a baseline experiment:
 ```bash
 cd project
 python scripts/run_experiment.py --scenario 50-50
-python scripts/run_experiment.py --scenario 60-40
 ```
 Additional Scenarios
 ```bash
+python scripts/run_experiment.py --scenario 60-40
 python scripts/run_experiment.py --scenario 10-90
 python scripts/run_experiment.py --scenario 1-99
 ```
