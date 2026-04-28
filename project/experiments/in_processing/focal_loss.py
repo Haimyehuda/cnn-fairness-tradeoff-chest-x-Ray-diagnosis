@@ -1,62 +1,70 @@
 """
-run_experiment.py
-=================
+focal_loss.py
+=============
 
-Protocol-driven experiment runner for the study:
-"Fairness vs. Accuracy in CNNs"
-
-Each execution:
-- Builds a TRAIN set according to a predefined imbalance scenario
-- Trains a temporary CNN model
-- Evaluates it on a fixed, locked EVAL reference set
-- Appends a single row to the global results table
-
-No model checkpoints are saved.
+In-processing fairness mitigation experiment using Focal Loss.
 """
 
-# -----------------------------
-# Standard imports
-# -----------------------------
 import os
+import sys
 import argparse
 import numpy as np
 import pandas as pd
 import torch
-import sys
+import torch.nn.functional as F
+from torch import nn
+from torch.utils.data import DataLoader
+from torchvision import transforms
 
 # -----------------------------
-# Resolve project paths FIRST
+# Resolve project paths
 # -----------------------------
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 COMMON_PATH = os.path.join(PROJECT_ROOT, "common")
 
 sys.path.insert(0, PROJECT_ROOT)
 sys.path.insert(0, COMMON_PATH)
 
 # -----------------------------
-# Standard / third-party imports
+# Project imports
 # -----------------------------
-from torch.utils.data import DataLoader
-from torchvision import transforms
-
-# -----------------------------
-# Project imports (now visible)
-# -----------------------------
-from experiment_logger import log_experiment_to_sheets
+from config import *
+from scripts.scenarios import SCENARIOS
 from dataset import XRTDataset
 from model import get_model
 from pipeline.train import train_model
 from pipeline.eval import evaluate_model
-from config import *
-from scripts.scenarios import SCENARIOS
+from experiment_logger import log_experiment_to_sheets
 
+# -----------------------------
+# Focal Loss Implementation
+# -----------------------------
+class FocalLoss(nn.Module):
+    def __init__(self, gamma=2.0, alpha=None, reduction='mean'):
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+        self.reduction = reduction
+
+    def forward(self, inputs, targets):
+        ce_loss = F.cross_entropy(inputs, targets, reduction='none', weight=self.alpha)
+        pt = torch.exp(-ce_loss)
+        focal_loss = ((1 - pt) ** self.gamma * ce_loss)
+
+        if self.reduction == 'mean':
+            return focal_loss.mean()
+        elif self.reduction == 'sum':
+            return focal_loss.sum()
+        else:
+            return focal_loss
 
 # -----------------------------
 # Argument parsing
 # -----------------------------
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Run a single fairness–accuracy experiment"
+        description="Run focal loss in-processing experiment"
     )
     parser.add_argument(
         "--scenario",
@@ -64,14 +72,21 @@ def parse_args():
         choices=SCENARIOS.keys(),
         help="Imbalance scenario identifier (e.g., 50-50, 10-90)",
     )
+    parser.add_argument(
+        "--gamma",
+        type=float,
+        default=2.0,
+        help="Focal Loss gamma parameter (default: 2.0)",
+    )
     return parser.parse_args()
-
 
 # -----------------------------
 # Main experiment logic
 # -----------------------------
 def main():
     print(f"\n=== {RESEARCH_TITLE} ===")
+    print("METHOD: Focal Loss")
+    
     args = parse_args()
     scenario = SCENARIOS[args.scenario]
 
@@ -85,7 +100,7 @@ def main():
     # -----------------------------
     assert os.path.exists(
         EVAL_INDEX_PATH
-    ), "Evaluation reference not found. Run Eval cell first."
+    ), f"Evaluation reference not found at {EVAL_INDEX_PATH}"
 
     eval_df = pd.read_csv(EVAL_INDEX_PATH)
     eval_paths = set(eval_df["image_path"])
@@ -96,7 +111,6 @@ def main():
     df = pd.read_csv(os.path.join(CHEXPERT_ROOT, "train.csv"))
     df["label"] = np.where(df["Pneumonia"] == 1, POS_LABEL, NEG_LABEL)
 
-    # Path is relative to /content/chexpert
     df["image_path"] = df["Path"].apply(
         lambda p: os.path.join(
             CHEXPERT_ROOT, p.replace("CheXpert-v1.0-small/", "").lstrip("/")
@@ -124,9 +138,9 @@ def main():
 
     print(f"\nRunning experiment: {scenario['name']}")
     print("TRAIN SET")
-    print("  PNEUMONIA:", (train_df["label"] == POS_LABEL).sum())
-    print("  NORMAL   :", (train_df["label"] == NEG_LABEL).sum())
-    print("  TOTAL    :", len(train_df))
+    print(f"  PNEUMONIA: {(train_df['label'] == POS_LABEL).sum()}")
+    print(f"  NORMAL   : {(train_df['label'] == NEG_LABEL).sum()}")
+    print(f"  TOTAL    : {len(train_df)}")
 
     # -----------------------------
     # Dataset & loaders
@@ -149,19 +163,27 @@ def main():
     # Model training
     # -----------------------------
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     model = get_model(num_classes=2).to(device)
 
+    # Focal Loss criterion
+    criterion = FocalLoss(gamma=args.gamma)
+
+    print(f"USING FOCAL LOSS (gamma={args.gamma})")
+
     train_model(
-        model=model, train_loader=train_loader, device=device, epochs=EPOCHS, lr=LR
+        model=model, 
+        train_loader=train_loader, 
+        device=device, 
+        epochs=EPOCHS, 
+        lr=LR,
+        criterion=criterion
     )
 
     # -----------------------------
     # Evaluation
     # -----------------------------
-    PLOTS_ROOT = DRIVE_ROOT
-
-    plots_dir = os.path.join(PLOTS_ROOT, scenario["name"])
+    run_name = scenario["name"] + "_FL"
+    plots_dir = os.path.join(DRIVE_ROOT, run_name)
 
     metrics = evaluate_model(
         model=model,
@@ -169,7 +191,7 @@ def main():
         device=device,
         make_plots=True,
         plots_dir=plots_dir,
-        run_name=scenario["name"],
+        run_name=run_name,
         research_title=RESEARCH_TITLE,
     )
 
@@ -177,7 +199,7 @@ def main():
     # Build results row
     # -----------------------------
     row = {
-        "Method": "Baseline",
+        "Method": "Focal Loss",
         "Scenario": args.scenario,
         "Train Ratio (P/N)": f"{scenario['n_pneumonia']}/{scenario['n_normal']}",
         "#P Train": scenario["n_pneumonia"],

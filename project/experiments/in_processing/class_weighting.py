@@ -1,62 +1,48 @@
 """
-run_experiment.py
-=================
+class_weighting.py
+==================
 
-Protocol-driven experiment runner for the study:
-"Fairness vs. Accuracy in CNNs"
-
-Each execution:
-- Builds a TRAIN set according to a predefined imbalance scenario
-- Trains a temporary CNN model
-- Evaluates it on a fixed, locked EVAL reference set
-- Appends a single row to the global results table
-
-No model checkpoints are saved.
+In-processing fairness mitigation experiment using Class Weighted Cross-Entropy.
 """
 
-# -----------------------------
-# Standard imports
-# -----------------------------
 import os
+import sys
 import argparse
 import numpy as np
 import pandas as pd
 import torch
-import sys
+from torch import nn
+from torch.utils.data import DataLoader
+from torchvision import transforms
 
 # -----------------------------
-# Resolve project paths FIRST
+# Resolve project paths
 # -----------------------------
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# project/experiments/in_processing -> project
+PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 COMMON_PATH = os.path.join(PROJECT_ROOT, "common")
 
 sys.path.insert(0, PROJECT_ROOT)
 sys.path.insert(0, COMMON_PATH)
 
 # -----------------------------
-# Standard / third-party imports
+# Project imports
 # -----------------------------
-from torch.utils.data import DataLoader
-from torchvision import transforms
-
-# -----------------------------
-# Project imports (now visible)
-# -----------------------------
-from experiment_logger import log_experiment_to_sheets
+from config import *
+from scripts.scenarios import SCENARIOS
 from dataset import XRTDataset
 from model import get_model
 from pipeline.train import train_model
 from pipeline.eval import evaluate_model
-from config import *
-from scripts.scenarios import SCENARIOS
-
+from experiment_logger import log_experiment_to_sheets
 
 # -----------------------------
 # Argument parsing
 # -----------------------------
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Run a single fairness–accuracy experiment"
+        description="Run class weighting in-processing experiment"
     )
     parser.add_argument(
         "--scenario",
@@ -66,12 +52,13 @@ def parse_args():
     )
     return parser.parse_args()
 
-
 # -----------------------------
 # Main experiment logic
 # -----------------------------
 def main():
     print(f"\n=== {RESEARCH_TITLE} ===")
+    print("METHOD: Class Weighting")
+    
     args = parse_args()
     scenario = SCENARIOS[args.scenario]
 
@@ -85,7 +72,7 @@ def main():
     # -----------------------------
     assert os.path.exists(
         EVAL_INDEX_PATH
-    ), "Evaluation reference not found. Run Eval cell first."
+    ), f"Evaluation reference not found at {EVAL_INDEX_PATH}"
 
     eval_df = pd.read_csv(EVAL_INDEX_PATH)
     eval_paths = set(eval_df["image_path"])
@@ -96,7 +83,6 @@ def main():
     df = pd.read_csv(os.path.join(CHEXPERT_ROOT, "train.csv"))
     df["label"] = np.where(df["Pneumonia"] == 1, POS_LABEL, NEG_LABEL)
 
-    # Path is relative to /content/chexpert
     df["image_path"] = df["Path"].apply(
         lambda p: os.path.join(
             CHEXPERT_ROOT, p.replace("CheXpert-v1.0-small/", "").lstrip("/")
@@ -124,9 +110,24 @@ def main():
 
     print(f"\nRunning experiment: {scenario['name']}")
     print("TRAIN SET")
-    print("  PNEUMONIA:", (train_df["label"] == POS_LABEL).sum())
-    print("  NORMAL   :", (train_df["label"] == NEG_LABEL).sum())
-    print("  TOTAL    :", len(train_df))
+    n_pneu = (train_df["label"] == POS_LABEL).sum()
+    n_norm = (train_df["label"] == NEG_LABEL).sum()
+    print(f"  PNEUMONIA: {n_pneu}")
+    print(f"  NORMAL   : {n_norm}")
+    print(f"  TOTAL    : {len(train_df)}")
+
+    # -----------------------------
+    # Calculate Class Weights
+    # -----------------------------
+    # Weight = Total / (NumClasses * NumSamplesInClass)
+    total_samples = n_pneu + n_norm
+    w_norm = total_samples / (2.0 * n_norm) if n_norm > 0 else 1.0
+    w_pneu = total_samples / (2.0 * n_pneu) if n_pneu > 0 else 1.0
+    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    class_weights = torch.tensor([w_norm, w_pneu], dtype=torch.float).to(device)
+    
+    print(f"CLASS WEIGHTS: NORMAL={w_norm:.3f}, PNEUMONIA={w_pneu:.3f}")
 
     # -----------------------------
     # Dataset & loaders
@@ -148,20 +149,24 @@ def main():
     # -----------------------------
     # Model training
     # -----------------------------
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     model = get_model(num_classes=2).to(device)
 
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
+
     train_model(
-        model=model, train_loader=train_loader, device=device, epochs=EPOCHS, lr=LR
+        model=model, 
+        train_loader=train_loader, 
+        device=device, 
+        epochs=EPOCHS, 
+        lr=LR,
+        criterion=criterion
     )
 
     # -----------------------------
     # Evaluation
     # -----------------------------
-    PLOTS_ROOT = DRIVE_ROOT
-
-    plots_dir = os.path.join(PLOTS_ROOT, scenario["name"])
+    run_name = scenario["name"] + "_CW"
+    plots_dir = os.path.join(DRIVE_ROOT, run_name)
 
     metrics = evaluate_model(
         model=model,
@@ -169,7 +174,7 @@ def main():
         device=device,
         make_plots=True,
         plots_dir=plots_dir,
-        run_name=scenario["name"],
+        run_name=run_name,
         research_title=RESEARCH_TITLE,
     )
 
@@ -177,7 +182,7 @@ def main():
     # Build results row
     # -----------------------------
     row = {
-        "Method": "Baseline",
+        "Method": "Class Weighting",
         "Scenario": args.scenario,
         "Train Ratio (P/N)": f"{scenario['n_pneumonia']}/{scenario['n_normal']}",
         "#P Train": scenario["n_pneumonia"],

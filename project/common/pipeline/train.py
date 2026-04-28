@@ -25,6 +25,7 @@ def train_model(
     device: torch.device,
     epochs: int = 10,
     lr: float = 1e-4,
+    criterion: nn.Module = None,
 ) -> None:
     """
     Train a model using cross-entropy loss.
@@ -35,11 +36,14 @@ def train_model(
         device (torch.device): CPU or CUDA device
         epochs (int): Number of training epochs
         lr (float): Learning rate
+        criterion (nn.Module): Loss function (optional)
     """
 
     model.train()
 
-    criterion = nn.CrossEntropyLoss()
+    if criterion is None:
+        criterion = nn.CrossEntropyLoss()
+
     optimizer = Adam(model.parameters(), lr=lr)
 
     for epoch in range(1, epochs + 1):

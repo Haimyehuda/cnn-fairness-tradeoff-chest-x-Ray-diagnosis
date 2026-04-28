@@ -26,3 +26,23 @@ NEG_LABEL = "NORMAL"
 IMAGE_SIZE = (224, 224)
 NORMALIZE_MEAN = [0.5]
 NORMALIZE_STD = [0.5]
+
+# Unified Result Schema
+RESULT_COLUMNS = [
+    "Method",
+    "Scenario",
+    "Train Ratio (P/N)",
+    "#P Train",
+    "#N Train",
+    "#Train After Processing",
+    "Accuracy (Overall)",
+    "Accuracy NORMAL",
+    "Accuracy PNEUMONIA",
+    "Recall / TPR NORMAL",
+    "Recall / TPR PNEUMONIA",
+    "F1 NORMAL",
+    "F1 PNEUMONIA",
+    "ΔTPR (Equal Opportunity)",
+    "ΔFPR (Equalized Odds)",
+    "Disparate Impact (DI)",
+]
