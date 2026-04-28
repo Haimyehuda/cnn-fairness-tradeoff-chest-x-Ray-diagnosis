@@ -74,19 +74,72 @@ project/
 ```
 ## Running Experiments
 
-To execute a baseline experiment:
+The experimental protocol consists of executing a series of controlled runs across multiple imbalance scenarios.
 
+Each experiment produces a single result row.
+A complete experimental run consists of four scenarios:
+
+- 50-50 (Balanced)
+- 60-40 (Mild imbalance)
+- 10-90 (High imbalance)
+- 1-99 (Extreme imbalance)
+
+### Execution
 ```bash
 cd project
 python scripts/run_experiment.py --scenario 50-50
-```
-Additional Scenarios
-```bash
 python scripts/run_experiment.py --scenario 60-40
 python scripts/run_experiment.py --scenario 10-90
 python scripts/run_experiment.py --scenario 1-99
 ```
-Augmentation Experiment
+Each execution:
+
+Trains a new model from scratch
+Evaluates on the same locked evaluation set
+Appends one row to the results table
+
+After completing all four runs, the results table will contain one row per scenario, enabling direct comparison.
+
+### Augmentation Experiment
 ```bash
 python experiments/pre_processing/augmentation.py --scenario 50-50
+python experiments/pre_processing/augmentation.py --scenario 60-40
+python experiments/pre_processing/augmentation.py --scenario 10-90
+python experiments/pre_processing/augmentation.py --scenario 1-99
 ```
+This produces an additional set of four rows, corresponding to the augmentation-based pipeline.
+
+## Results
+
+All experiment results are stored as a single CSV file in persistent storage:
+/content/drive/MyDrive/cnn_fairness_experiments/results_table.csv
+
+Each experiment appends one row, enabling cumulative analysis across scenarios.
+
+## Fairness–Accuracy Trade-off
+
+The core objective is to analyze how fairness metrics evolve as class imbalance increases.
+
+Rather than assuming fixed outcomes, the study evaluates trends across scenarios:
+
+| Scenario | Expected Behavior |
+|----------|------------------|
+| 50-50    | Baseline performance with minimal fairness gaps |
+| 60-40    | Mild deviation in fairness metrics |
+| 10-90    | Noticeable increase in fairness gaps |
+| 1-99     | Significant disparity between groups |
+
+Key observations focus on:
+
+- Increase in ΔTPR (Equal Opportunity gap)
+- Increase in ΔFPR (Equalized Odds gap)
+- Disparate Impact deviating from 1.0
+
+## Visualizations
+
+For each experiment, the following outputs are generated:
+
+- Confusion Matrix (counts and normalized)
+- ROC Curve with AUC
+- Precision–Recall Curve with AP
+- Per-class metrics (Accuracy, TPR, FPR, F1)
