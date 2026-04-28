@@ -15,7 +15,7 @@ LR = 1e-4
 CHEXPERT_ROOT = "/content/chexpert"
 EVAL_INDEX_PATH = "/content/eval_reference/eval_index.csv"
 
-DRIVE_ROOT = "/content/drive/MyDrive/cnn_fairness_experiments"
+DRIVE_ROOT = "/content/drive/MyDrive/Fairness-vs.-Accuracy-in-CNNs"
 os.makedirs(DRIVE_ROOT, exist_ok=True)
 RESULTS_PATH = f"{DRIVE_ROOT}/results_table.csv"
 
