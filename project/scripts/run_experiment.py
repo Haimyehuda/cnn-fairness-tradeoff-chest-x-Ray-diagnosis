@@ -177,11 +177,12 @@ def main():
     # Build results row
     # -----------------------------
     row = {
-        "Research": RESEARCH_TITLE,
-        "Experiment": scenario["name"],
+        "Method": "Baseline",
+        "Scenario": args.scenario,
         "Train Ratio (P/N)": f"{scenario['n_pneumonia']}/{scenario['n_normal']}",
         "#P Train": scenario["n_pneumonia"],
         "#N Train": scenario["n_normal"],
+        "#Train After Processing": len(train_df),
         "Accuracy (Overall)": metrics["accuracy"],
         "Accuracy NORMAL": metrics["acc_normal"],
         "Accuracy PNEUMONIA": metrics["acc_pneumonia"],
@@ -200,7 +201,13 @@ def main():
     df_row = pd.DataFrame([row])
 
     if os.path.exists(RESULTS_PATH):
-        df_row.to_csv(RESULTS_PATH, mode="a", header=False, index=False)
+        try:
+            existing_df = pd.read_csv(RESULTS_PATH)
+            updated_df = pd.concat([existing_df, df_row], ignore_index=True)
+            updated_df = updated_df.reindex(columns=df_row.columns)
+            updated_df.to_csv(RESULTS_PATH, index=False)
+        except Exception:
+            df_row.to_csv(RESULTS_PATH, mode="a", header=False, index=False)
     else:
         df_row.to_csv(RESULTS_PATH, index=False)
 
