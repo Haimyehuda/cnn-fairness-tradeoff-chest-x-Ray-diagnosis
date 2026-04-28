@@ -114,7 +114,7 @@ This produces an additional set of four rows, corresponding to the augmentation-
 ## Results
 
 All experiment results are stored as a cumulative CSV file in persistent storage:
-`/content/drive/MyDrive/Fairness-vs.-Accuracy-in-CNNs/results_table.csv`
+`/content/drive/MyDrive/Fairness-vs-Accuracy-in-CNNs/results_table.csv`
 
 Each experiment appends one row, enabling cumulative analysis across scenarios.
 
