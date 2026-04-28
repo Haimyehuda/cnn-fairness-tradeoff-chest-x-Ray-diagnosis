@@ -13,7 +13,7 @@ EPOCHS = 10
 LR = 1e-4
 
 CHEXPERT_ROOT = "/content/chexpert"
-EVAL_INDEX_PATH = "/content/eval_reference/eval_index.csv"
+EVAL_INDEX_PATH = "/content/drive/MyDrive/Fairness-vs.-Accuracy-in-CNNs/eval_reference/eval_index.csv"
 
 DRIVE_ROOT = "/content/drive/MyDrive/Fairness-vs-Accuracy-in-CNNs"
 os.makedirs(DRIVE_ROOT, exist_ok=True)
