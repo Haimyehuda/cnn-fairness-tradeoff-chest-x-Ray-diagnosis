@@ -3,7 +3,7 @@ run_experiment.py
 =================
 
 Protocol-driven experiment runner for the study:
-"Fairness–Accuracy Trade-Off in CNN-based Pneumonia Diagnosis"
+"Fairness vs. Accuracy in CNNs"
 
 Each execution:
 - Builds a TRAIN set according to a predefined imbalance scenario
@@ -30,6 +30,7 @@ import sys
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 COMMON_PATH = os.path.join(PROJECT_ROOT, "common")
 
+sys.path.insert(0, PROJECT_ROOT)
 sys.path.insert(0, COMMON_PATH)
 
 # -----------------------------
@@ -46,57 +47,8 @@ from dataset import XRTDataset
 from model import get_model
 from pipeline.train import train_model
 from pipeline.eval import evaluate_model
-
-# -----------------------------
-# Research constants
-# -----------------------------
-EXPERIMENT_SHEET_ID = "1pA7K5EG36SCPi-jZEzb1wVFAP1S9TEVLZ0ogps2Bff0"
-
-# -----------------------------
-# Scenario definitions
-# -----------------------------
-SCENARIOS = {
-    "50-50": {
-        "name": "Balanced_50_50",
-        "n_pneumonia": 1500,
-        "n_normal": 1500,
-    },
-    "60-40": {
-        "name": "Imbalanced_60_40",
-        "n_pneumonia": 1500,
-        "n_normal": 1000,
-    },
-    "10-90": {
-        "name": "Imbalanced_10_90",
-        "n_pneumonia": 1500,
-        "n_normal": 166,
-    },
-    "1-99": {
-        "name": "Imbalanced_1_99",
-        "n_pneumonia": 1500,
-        "n_normal": 15,
-    },
-}
-
-# -----------------------------
-# Global research constants
-# -----------------------------
-SEED = 42
-MODEL_ARCH = "densenet121"
-BATCH_SIZE = 16
-EPOCHS = 10
-LR = 1e-4
-
-CHEXPERT_ROOT = "/content/chexpert"
-EVAL_INDEX_PATH = "/content/eval_reference/eval_index.csv"
-
-DRIVE_ROOT = "/content/drive/MyDrive/cnn_fairness_experiments"
-os.makedirs(DRIVE_ROOT, exist_ok=True)
-
-RESULTS_PATH = os.path.join(DRIVE_ROOT, "results_table.csv")
-
-POS_LABEL = "PNEUMONIA"
-NEG_LABEL = "NORMAL"
+from config import *
+from scripts.scenarios import SCENARIOS
 
 
 # -----------------------------
@@ -119,6 +71,7 @@ def parse_args():
 # Main experiment logic
 # -----------------------------
 def main():
+    print(f"\n=== {RESEARCH_TITLE} ===")
     args = parse_args()
     scenario = SCENARIOS[args.scenario]
 
@@ -180,9 +133,9 @@ def main():
     # -----------------------------
     transform = transforms.Compose(
         [
-            transforms.Resize((224, 224)),
+            transforms.Resize(IMAGE_SIZE),
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5], std=[0.5]),
+            transforms.Normalize(mean=NORMALIZE_MEAN, std=NORMALIZE_STD),
         ]
     )
 
@@ -206,7 +159,7 @@ def main():
     # -----------------------------
     # Evaluation
     # -----------------------------
-    PLOTS_ROOT = "/content/drive/MyDrive/cnn_fairness_experiments"
+    PLOTS_ROOT = DRIVE_ROOT
 
     plots_dir = os.path.join(PLOTS_ROOT, scenario["name"])
 
@@ -217,12 +170,14 @@ def main():
         make_plots=True,
         plots_dir=plots_dir,
         run_name=scenario["name"],
+        research_title=RESEARCH_TITLE,
     )
 
     # -----------------------------
     # Build results row
     # -----------------------------
     row = {
+        "Research": RESEARCH_TITLE,
         "Experiment": scenario["name"],
         "Train Ratio (P/N)": f"{scenario['n_pneumonia']}/{scenario['n_normal']}",
         "#P Train": scenario["n_pneumonia"],

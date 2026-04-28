@@ -48,29 +48,7 @@ from model import get_model
 from pipeline.train import train_model
 from pipeline.eval import evaluate_model
 from experiment_logger import log_experiment_to_sheets
-
-# ===============================================================
-# Global research constants (MUST match baseline)
-# ===============================================================
-SEED = 42
-MODEL_ARCH = "densenet121"
-BATCH_SIZE = 16
-EPOCHS = 10
-LR = 1e-4
-
-CHEXPERT_ROOT = "/content/chexpert"
-EVAL_INDEX_PATH = "/content/eval_reference/eval_index.csv"
-
-# Persistent storage (Drive)
-DRIVE_ROOT = "/content/drive/MyDrive/cnn_fairness_experiments"
-os.makedirs(DRIVE_ROOT, exist_ok=True)
-RESULTS_PATH = os.path.join(DRIVE_ROOT, "results_table.csv")
-
-# Google Sheets (global research ledger)
-EXPERIMENT_SHEET_ID = "1pA7K5EG36SCPi-jZEzb1wVFAP1S9TEVLZ0ogps2Bff0"
-
-POS_LABEL = "PNEUMONIA"
-NEG_LABEL = "NORMAL"
+from config import *
 
 
 # ===============================================================
@@ -158,20 +136,20 @@ def main():
     # -----------------------------------------------------------
     train_transform = transforms.Compose(
         [
-            transforms.Resize((224, 224)),
+            transforms.Resize(IMAGE_SIZE),
             transforms.RandomHorizontalFlip(p=0.5),
             transforms.RandomRotation(10),
-            transforms.RandomResizedCrop(224, scale=(0.9, 1.0)),
+            transforms.RandomResizedCrop(IMAGE_SIZE, scale=(0.9, 1.0)),
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5], std=[0.5]),
+            transforms.Normalize(mean=NORMALIZE_MEAN, std=NORMALIZE_STD),
         ]
     )
 
     eval_transform = transforms.Compose(
         [
-            transforms.Resize((224, 224)),
+            transforms.Resize(IMAGE_SIZE),
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5], std=[0.5]),
+            transforms.Normalize(mean=NORMALIZE_MEAN, std=NORMALIZE_STD),
         ]
     )
 
@@ -210,12 +188,14 @@ def main():
         make_plots=True,
         plots_dir=plots_dir,
         run_name=scenario["name"] + "_AUG",
+        research_title=RESEARCH_TITLE,
     )
 
     # -----------------------------------------------------------
     # Build results row (schema MUST match baseline)
     # -----------------------------------------------------------
     row = {
+        "Research": RESEARCH_TITLE,
         "Experiment": scenario["name"] + "_AUG",
         "Train Ratio (P/N)": f"{scenario['n_pneumonia']}/{scenario['n_normal']}",
         "#P Train": scenario["n_pneumonia"],

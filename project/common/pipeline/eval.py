@@ -206,6 +206,7 @@ def evaluate_model(
     make_plots: bool = False,
     plots_dir: str | None = None,
     run_name: str = "eval",
+    research_title=None,
 ) -> dict:
     """
     Evaluate a trained model on a fixed evaluation set.
@@ -326,14 +327,15 @@ def evaluate_model(
         _apply_medical_style()
 
         # Confusion matrices
+        title_prefix = f"{research_title} | " if research_title else run_name
         _plot_confusion(
             cm,
-            f"{run_name} | Confusion Matrix (Counts)",
+            f"{title_prefix}{run_name} | Confusion Matrix (Counts)",
             os.path.join(plots_dir, f"{run_name}_cm_counts.png"),
         )
         _plot_confusion_norm(
             cm,
-            f"{run_name} | Confusion Matrix (Normalized)",
+            f"{title_prefix}{run_name} | Confusion Matrix (Normalized)",
             os.path.join(plots_dir, f"{run_name}_cm_norm.png"),
         )
 
@@ -341,20 +343,20 @@ def evaluate_model(
         auc = _plot_roc(
             y_true,
             y_score,
-            f"{run_name} | ROC",
+            f"{title_prefix}{run_name} | ROC",
             os.path.join(plots_dir, f"{run_name}_roc.png"),
         )
         ap = _plot_pr(
             y_true,
             y_score,
-            f"{run_name} | Precision-Recall",
+            f"{title_prefix}{run_name} | Precision-Recall",
             os.path.join(plots_dir, f"{run_name}_pr.png"),
         )
 
         # Per-class bars
         _plot_class_bars(
             metrics,
-            f"{run_name} | Per-class Metrics",
+            f"{title_prefix}{run_name} | Per-class Metrics",
             os.path.join(plots_dir, f"{run_name}_class_metrics.png"),
         )
 
