@@ -52,7 +52,7 @@ In addition, the following visualizations are generated:
 - Per-class performance comparison
 
 ## Project Structure
-
+```
 project/
   common/
     config.py
@@ -71,7 +71,7 @@ project/
   experiments/
     pre_processing/
       augmentation.py
-
+```
 ## Running Experiments
 
 To execute a baseline experiment:
@@ -80,9 +80,13 @@ To execute a baseline experiment:
 cd project
 python scripts/run_experiment.py --scenario 50-50
 python scripts/run_experiment.py --scenario 60-40
+```
+Additional Scenarios
+```bash
 python scripts/run_experiment.py --scenario 10-90
 python scripts/run_experiment.py --scenario 1-99
-
-### Augmentation Experiment
+```
+Augmentation Experiment
+```bash
 python experiments/pre_processing/augmentation.py --scenario 50-50
 ```
