@@ -1,0 +1,232 @@
+"""
+Oversampling Experiment (Pre-processing)
+
+Runs controlled oversampling experiments using the same protocol:
+- Same scenarios
+- Same locked evaluation set
+- Same DenseNet-121 model
+- Same metrics and logging
+- Oversampling applied ONLY to TRAIN set
+"""
+
+import os
+import sys
+import argparse
+import numpy as np
+import pandas as pd
+import torch
+
+from torch.utils.data import DataLoader
+from torchvision import transforms
+
+# ===============================================================
+# Path setup
+# ===============================================================
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
+COMMON_PATH = os.path.join(PROJECT_ROOT, "common")
+
+sys.path.insert(0, PROJECT_ROOT)
+sys.path.insert(0, COMMON_PATH)
+
+# ===============================================================
+# Project imports
+# ===============================================================
+from scripts.scenarios import SCENARIOS
+from config import (
+    RESEARCH_TITLE,
+    EXPERIMENT_SHEET_ID,
+    SEED,
+    BATCH_SIZE,
+    EPOCHS,
+    LR,
+    CHEXPERT_ROOT,
+    EVAL_INDEX_PATH,
+    DRIVE_ROOT,
+    RESULTS_PATH,
+    POS_LABEL,
+    NEG_LABEL,
+    IMAGE_SIZE,
+    NORMALIZE_MEAN,
+    NORMALIZE_STD,
+)
+
+from dataset import XRTDataset
+from model import get_model
+from pipeline.train import train_model
+from pipeline.eval import evaluate_model
+from experiment_logger import log_experiment_to_sheets
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Run pre-processing oversampling experiment"
+    )
+    parser.add_argument(
+        "--scenario",
+        required=True,
+        choices=SCENARIOS.keys(),
+        help="Imbalance scenario identifier",
+    )
+    return parser.parse_args()
+
+
+def oversample_minority(train_df: pd.DataFrame) -> pd.DataFrame:
+    counts = train_df["label"].value_counts()
+
+    majority_label = counts.idxmax()
+    minority_label = counts.idxmin()
+
+    majority_df = train_df[train_df["label"] == majority_label]
+    minority_df = train_df[train_df["label"] == minority_label]
+
+    minority_upsampled = minority_df.sample(
+        n=len(majority_df),
+        replace=True,
+        random_state=SEED,
+    )
+
+    balanced_df = pd.concat([majority_df, minority_upsampled], ignore_index=True)
+    balanced_df = balanced_df.sample(frac=1, random_state=SEED).reset_index(drop=True)
+
+    print("\nOVERSAMPLING")
+    print("  Before:", counts.to_dict())
+    print("  After :", balanced_df["label"].value_counts().to_dict())
+
+    return balanced_df
+
+
+def main():
+    args = parse_args()
+    scenario = SCENARIOS[args.scenario]
+
+    print(f"\n=== {RESEARCH_TITLE} ===")
+    print(f"Running OVERSAMPLING experiment: {scenario['name']}")
+
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
+    torch.cuda.manual_seed_all(SEED)
+
+    assert os.path.exists(
+        EVAL_INDEX_PATH
+    ), "Evaluation reference not found. Run Eval cell first."
+
+    eval_df = pd.read_csv(EVAL_INDEX_PATH)
+    eval_paths = set(eval_df["image_path"])
+
+    df = pd.read_csv(os.path.join(CHEXPERT_ROOT, "train.csv"))
+    df["label"] = np.where(df["Pneumonia"] == 1, POS_LABEL, NEG_LABEL)
+
+    df["image_path"] = df["Path"].apply(
+        lambda p: os.path.join(
+            CHEXPERT_ROOT,
+            p.replace("CheXpert-v1.0-small/", "").lstrip("/"),
+        )
+    )
+
+    train_pool = df[~df["image_path"].isin(eval_paths)]
+
+    rng = np.random.RandomState(SEED)
+
+    train_pos = train_pool[train_pool["label"] == POS_LABEL].sample(
+        n=scenario["n_pneumonia"],
+        random_state=rng,
+    )
+
+    train_neg = train_pool[train_pool["label"] == NEG_LABEL].sample(
+        n=scenario["n_normal"],
+        random_state=rng,
+    )
+
+    train_df_original = pd.concat([train_pos, train_neg], ignore_index=True)
+    train_df_original = train_df_original.sample(
+        frac=1,
+        random_state=rng,
+    ).reset_index(drop=True)
+
+    train_df = oversample_minority(train_df_original)
+
+    train_transform = transforms.Compose(
+        [
+            transforms.Resize(IMAGE_SIZE),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=NORMALIZE_MEAN, std=NORMALIZE_STD),
+        ]
+    )
+
+    eval_transform = transforms.Compose(
+        [
+            transforms.Resize(IMAGE_SIZE),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=NORMALIZE_MEAN, std=NORMALIZE_STD),
+        ]
+    )
+
+    train_ds = XRTDataset(train_df, transform=train_transform)
+    eval_ds = XRTDataset(eval_df, transform=eval_transform)
+
+    train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True)
+    eval_loader = DataLoader(eval_ds, batch_size=BATCH_SIZE, shuffle=False)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = get_model(num_classes=2).to(device)
+
+    train_model(
+        model=model,
+        train_loader=train_loader,
+        device=device,
+        epochs=EPOCHS,
+        lr=LR,
+    )
+
+    run_name = scenario["name"] + "_OS"
+    plots_dir = os.path.join(DRIVE_ROOT, run_name)
+
+    metrics = evaluate_model(
+        model=model,
+        dataloader=eval_loader,
+        device=device,
+        make_plots=True,
+        plots_dir=plots_dir,
+        run_name=run_name,
+        research_title=RESEARCH_TITLE,
+    )
+
+    row = {
+        "Research": RESEARCH_TITLE,
+        "Experiment": run_name,
+        "Train Ratio (P/N)": f"{scenario['n_pneumonia']}/{scenario['n_normal']}",
+        "#P Train": scenario["n_pneumonia"],
+        "#N Train": scenario["n_normal"],
+        "#Train After Oversampling": len(train_df),
+        "Accuracy (Overall)": metrics["accuracy"],
+        "Accuracy NORMAL": metrics["acc_normal"],
+        "Accuracy PNEUMONIA": metrics["acc_pneumonia"],
+        "Recall / TPR NORMAL": metrics["tpr_normal"],
+        "Recall / TPR PNEUMONIA": metrics["tpr_pneumonia"],
+        "F1 NORMAL": metrics["f1_normal"],
+        "F1 PNEUMONIA": metrics["f1_pneumonia"],
+        "ΔTPR (Equal Opportunity)": metrics["delta_tpr"],
+        "ΔFPR (Equalized Odds)": metrics["delta_fpr"],
+        "Disparate Impact (DI)": metrics["disparate_impact"],
+    }
+
+    df_row = pd.DataFrame([row])
+
+    if os.path.exists(RESULTS_PATH):
+        df_row.to_csv(RESULTS_PATH, mode="a", header=False, index=False)
+    else:
+        df_row.to_csv(RESULTS_PATH, index=False)
+
+    try:
+        log_experiment_to_sheets(row, EXPERIMENT_SHEET_ID)
+        print("✔ Results appended to Google Sheets")
+    except Exception as e:
+        print("⚠️ Failed to write to Google Sheets:", e)
+
+    print("\n✔ Oversampling experiment completed successfully")
+    print(df_row)
+
+
+if __name__ == "__main__":
+    main()
