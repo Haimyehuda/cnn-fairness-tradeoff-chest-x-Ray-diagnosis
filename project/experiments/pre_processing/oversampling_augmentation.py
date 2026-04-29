@@ -42,6 +42,7 @@ from config import (
     IMAGE_SIZE,
     NORMALIZE_MEAN,
     NORMALIZE_STD,
+    RESULT_COLUMNS,
 )
 
 from dataset import XRTDataset

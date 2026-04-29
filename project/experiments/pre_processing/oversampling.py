@@ -49,6 +49,7 @@ from config import (
     IMAGE_SIZE,
     NORMALIZE_MEAN,
     NORMALIZE_STD,
+    RESULT_COLUMNS,
 )
 
 from dataset import XRTDataset
@@ -212,7 +213,7 @@ def main():
     }
 
     df_row = pd.DataFrame([row])
-    
+
     # Ensure unified column order
     df_row = df_row.reindex(columns=RESULT_COLUMNS)
 
