@@ -267,13 +267,18 @@ def evaluate_model(
     )
 
     # TPR / FPR (by class)
-    # Note: For NORMAL (class 0), recall = TN / (TN+FP)
-    tpr_normal = float(TN / (TN + FP + 1e-12))
-    fpr_normal = float(FP / (TN + FP + 1e-12))
+    # Per-class TPR / FPR definitions.
+    # Each class is treated as the target class when computing its own rates.
+    # tpr_normal = TN / (TN + FP)
+    # tpr_pneumonia = TP / (TP + FN)
+    # fpr_normal = FN / (TP + FN)
+    # fpr_pneumonia = FP / (TN + FP)
 
-    # For PNEUMONIA (class 1), recall = TP / (TP+FN)
+    tpr_normal = float(TN / (TN + FP + 1e-12))
     tpr_pneumonia = float(TP / (TP + FN + 1e-12))
-    fpr_pneumonia = float(FN / (TP + FN + 1e-12))  # kept consistent with your code
+
+    fpr_normal = float(FN / (TP + FN + 1e-12))
+    fpr_pneumonia = float(FP / (TN + FP + 1e-12))
 
     # Fairness gaps
     delta_tpr = float(abs(tpr_normal - tpr_pneumonia))
@@ -290,17 +295,10 @@ def evaluate_model(
         float(ppr_pneumonia / (ppr_normal + 1e-12)) if ppr_normal > 0 else 0.0
     )
 
-    # F1-score per class (computed within each class subset)
-    f1_normal = (
-        float(f1_score(y_true[y_true == 0], y_pred[y_true == 0], zero_division=0))
-        if (y_true == 0).any()
-        else 0.0
-    )
-    f1_pneumonia = (
-        float(f1_score(y_true[y_true == 1], y_pred[y_true == 1], zero_division=0))
-        if (y_true == 1).any()
-        else 0.0
-    )
+    # F1-score per class (computed over the full dataset)
+    f1_per_class = f1_score(y_true, y_pred, labels=[0, 1], average=None, zero_division=0)
+    f1_normal = float(f1_per_class[0])
+    f1_pneumonia = float(f1_per_class[1])
 
     metrics = {
         "accuracy": accuracy,

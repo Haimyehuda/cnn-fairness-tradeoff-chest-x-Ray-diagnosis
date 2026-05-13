@@ -1,0 +1,8 @@
+torch
+torchvision
+pandas
+numpy
+gspread
+google-auth
+matplotlib
+scikit-learn

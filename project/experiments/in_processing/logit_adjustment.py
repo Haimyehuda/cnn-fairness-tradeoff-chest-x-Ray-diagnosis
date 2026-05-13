@@ -16,25 +16,15 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 # -----------------------------
-# Resolve project paths
-# -----------------------------
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
-COMMON_PATH = os.path.join(PROJECT_ROOT, "common")
-
-sys.path.insert(0, PROJECT_ROOT)
-sys.path.insert(0, COMMON_PATH)
-
-# -----------------------------
 # Project imports
 # -----------------------------
-from config import *
-from scripts.scenarios import SCENARIOS
-from dataset import XRTDataset
-from model import get_model
-from pipeline.train import train_model
-from pipeline.eval import evaluate_model
-from experiment_logger import log_experiment_to_sheets
+from project.common.config import *
+from project.scripts.scenarios import SCENARIOS
+from project.common.dataset import XRTDataset
+from project.common.model import get_model
+from project.common.pipeline.train import train_model
+from project.common.pipeline.eval import evaluate_model
+from project.common.experiment_logger import log_experiment_to_sheets
 
 # -----------------------------
 # Logit Adjustment Loss Wrapper
@@ -78,7 +68,7 @@ def parse_args():
 def main():
     print(f"\n=== {RESEARCH_TITLE} ===")
     print("METHOD: Logit Adjustment")
-    
+
     args = parse_args()
     scenario = SCENARIOS[args.scenario]
 
@@ -142,7 +132,7 @@ def main():
     total = n_pneu + n_norm
     p_norm = n_norm / total if total > 0 else 0.5
     p_pneu = n_pneu / total if total > 0 else 0.5
-    
+
     # log_prior = tau * log(p_y)
     # We use a small epsilon to avoid log(0)
     eps = 1e-12
@@ -150,7 +140,7 @@ def main():
         args.tau * np.log(p_norm + eps),
         args.tau * np.log(p_pneu + eps)
     ], dtype=torch.float)
-    
+
     print(f"LOG PRIORS (tau={args.tau}): NORMAL={log_priors[0]:.4f}, PNEUMONIA={log_priors[1]:.4f}")
 
     # -----------------------------
@@ -180,10 +170,10 @@ def main():
     criterion = LogitAdjustmentLoss(log_priors=log_priors)
 
     train_model(
-        model=model, 
-        train_loader=train_loader, 
-        device=device, 
-        epochs=EPOCHS, 
+        model=model,
+        train_loader=train_loader,
+        device=device,
+        epochs=EPOCHS,
         lr=LR,
         criterion=criterion
     )
@@ -230,7 +220,7 @@ def main():
     # Persist results
     # -----------------------------
     df_row = pd.DataFrame([row])
-    
+
     # Ensure unified column order
     df_row = df_row.reindex(columns=RESULT_COLUMNS)
 
